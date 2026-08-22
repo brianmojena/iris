@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AdjustmentsPanel } from './components/AdjustmentsPanel'
 import { GeometryPanel } from './components/GeometryPanel'
+import { HistoryPanel } from './components/HistoryPanel'
 import { CanvasView } from './components/CanvasView'
 import { Dropzone } from './components/Dropzone'
 import { ExportDialog } from './components/ExportDialog'
 import { TopBar } from './components/TopBar'
-import { IconClose, IconCrop, IconSliders } from './components/icons'
+import { IconClock, IconClose, IconCrop, IconSliders } from './components/icons'
 import { useEditor } from './state/editorStore'
 
 export default function App() {
@@ -15,15 +16,21 @@ export default function App() {
   const openFile = useEditor((s) => s.openFile)
   const undo = useEditor((s) => s.undo)
   const redo = useEditor((s) => s.redo)
+  const restoreSession = useEditor((s) => s.restoreSession)
 
   const [exporting, setExporting] = useState(false)
   const [comparing, setComparing] = useState(false)
-  const [tab, setTab] = useState<'adjust' | 'crop'>('adjust')
+  const [tab, setTab] = useState<'adjust' | 'crop' | 'history'>('adjust')
   // Drag events bubble through every child, so track enter/leave depth.
   const dragDepth = useRef(0)
   const [draggingOver, setDraggingOver] = useState(false)
 
   const openExport = useCallback(() => setExporting(true), [])
+
+  // Pick up where the last visit left off, before anything else touches state.
+  useEffect(() => {
+    void restoreSession()
+  }, [restoreSession])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -130,13 +137,18 @@ export default function App() {
             >
               <IconCrop /> Recorte
             </button>
+            <button
+              className="tabs__tab"
+              aria-pressed={tab === 'history'}
+              onClick={() => setTab('history')}
+            >
+              <IconClock /> Historial
+            </button>
           </nav>
 
-          {tab === 'adjust' ? (
-            <AdjustmentsPanel onExport={openExport} />
-          ) : (
-            <GeometryPanel onDone={() => setTab('adjust')} />
-          )}
+          {tab === 'adjust' && <AdjustmentsPanel onExport={openExport} />}
+          {tab === 'crop' && <GeometryPanel onDone={() => setTab('adjust')} />}
+          {tab === 'history' && <HistoryPanel />}
         </div>
       </div>
 

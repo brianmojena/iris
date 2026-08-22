@@ -10,12 +10,12 @@ npm run dev
 
 ## Estado
 
-**MVP completo.** Carga de imagen, motor de render WebGL2, quince controles
-repartidos en luz, color, detalle y efectos, editor de recorte con proporciones
-fijas y enderezado, zoom y desplazamiento, comparación con el original,
-historial y exportación.
+**MVP completo, más historial y persistencia.** Quince controles repartidos en
+luz, color, detalle y efectos; editor de recorte con proporciones fijas y
+enderezado; panel de historial navegable; preajustes propios y de fábrica; y la
+sesión se recupera sola al volver.
 
-Pendiente: panel de historial visible y persistencia de proyectos en IndexedDB.
+Pendiente: interfaz bilingüe, pruebas de regresión de render, y demo desplegada.
 
 ## Cómo está construido
 
@@ -34,6 +34,8 @@ src/
     shaders/                 el pipeline, en GLSL
   lib/
     decode.ts                apertura de archivos, HEIC, orientación EXIF
+    storage.ts               sesión y preajustes en IndexedDB
+    describe.ts              etiqueta cada paso del historial a partir del diff
     export.ts                render a tamaño completo y descarga
     matrix.ts                afín 3×3, en el orden que espera WebGL
     crop.ts                  arrastre de tiradores y proporciones
@@ -113,6 +115,28 @@ Tres detalles que costaron encontrar:
   desplazaba el brillo medio de un cielo liso en cincuenta niveles.
 - El grano se atenúa con la reducción de escala del preview. Sin eso, la vista
   previa mostraba mucho más grano del que acababa teniendo el archivo.
+
+### El historial y la sesión
+
+El historial es **una lista con un puntero**, no dos pilas. Deshacer y rehacer
+mueven el puntero; el panel deja saltar a cualquier punto pinchándolo. Editar
+desde un punto intermedio descarta la rama que quedaba por delante, que es lo que
+hace cualquier editor y lo que la gente espera.
+
+Las etiquetas de cada paso —«Exposición +0,30», «Giro a la derecha»— se **derivan
+del diff** entre estados, no se pasan a mano en cada llamada. Una etiqueta escrita
+a mano acaba, tarde o temprano, contando algo distinto de lo que el paso hizo.
+
+Al cerrar la pestaña se guarda en IndexedDB el archivo original tal cual llegó,
+junto con la lista completa de pasos. Guardar solo el estado final habría
+devuelto la foto pero dejado el deshacer apuntando a nada, y «sigues donde lo
+dejaste» dejaría de ser cierto en cuanto pulsaras ⌘Z. La escritura va con retardo:
+guardar en cada movimiento de un control significaría serializar un blob de
+varios megabytes docenas de veces por segundo.
+
+El almacenamiento es una comodidad, nunca un requisito. En navegación privada, con
+el disco lleno o con IndexedDB deshabilitado, cada operación se traga su fallo y
+el editor sigue funcionando en memoria.
 
 ## Formatos
 

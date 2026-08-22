@@ -5,6 +5,7 @@ import {
   DEFAULT_ADJUSTMENTS,
   isDefault,
 } from '../types/adjustments'
+import { PresetStrip } from './PresetStrip'
 import { Slider } from './Slider'
 import { IconDownload, IconReset } from './icons'
 
@@ -29,6 +30,8 @@ export function AdjustmentsPanel({ onExport }: { onExport: () => void }) {
   return (
     <aside className="panel">
       <div className="panel__scroll">
+        <PresetStrip />
+
         {ADJUSTMENT_GROUPS.map((group) => (
           <section className="group" key={group.id}>
             <h2 className="group__title">{group.label}</h2>

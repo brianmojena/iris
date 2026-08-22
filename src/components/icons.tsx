@@ -135,3 +135,10 @@ export const IconCheck = ({ size = 17 }: IconProps) => (
     <path d="m4.5 10.5 3.5 3.5 7.5-8" />
   </svg>
 )
+
+export const IconClock = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <circle cx="10" cy="10" r="7" />
+    <path d="M10 6v4.25l2.75 1.75" />
+  </svg>
+)

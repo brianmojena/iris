@@ -15,21 +15,21 @@ const NATIVE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'ima
 
 export const ACCEPTED_FILE_TYPES = [...NATIVE_TYPES, 'image/heic', 'image/heif'].join(',')
 
-function isHeic(file: File): boolean {
-  const type = file.type.toLowerCase()
+function isHeic(blob: Blob, name: string): boolean {
+  const type = blob.type.toLowerCase()
   if (type === 'image/heic' || type === 'image/heif') return true
   // iOS sometimes hands over an empty MIME type, so fall back to the extension.
-  return /\.(heic|heif)$/i.test(file.name)
+  return /\.(heic|heif)$/i.test(name)
 }
 
 /**
  * HEIC support costs about a megabyte of WebAssembly, so it is only fetched the
  * first time somebody actually drops a photo straight from an iPhone.
  */
-async function decodeHeic(file: File): Promise<Blob> {
+async function decodeHeic(blob: Blob): Promise<Blob> {
   const { heicTo } = await import('heic-to')
   try {
-    return await heicTo({ blob: file, type: 'image/png' })
+    return await heicTo({ blob, type: 'image/png' })
   } catch (cause) {
     throw new DecodeError(
       'No se pudo leer el archivo HEIC. Puede estar dañado o usar una variante no soportada.',
@@ -68,11 +68,18 @@ function maxTextureSize(): number {
   return limit
 }
 
-export async function loadImageFile(file: File): Promise<LoadedImage> {
-  const source: Blob = isHeic(file) ? await decodeHeic(file) : file
+/**
+ * Decodes an image that is already in hand as a blob.
+ *
+ * Restoring a saved session goes through here: the original bytes were kept, so
+ * the restored photo is bit-identical to what was opened, HEIC included.
+ */
+export async function decodeBlob(blob: Blob, name: string): Promise<LoadedImage> {
+  const heic = isHeic(blob, name)
+  const source: Blob = heic ? await decodeHeic(blob) : blob
 
-  if (!isHeic(file) && !NATIVE_TYPES.includes(file.type)) {
-    throw new DecodeError(`Formato no soportado: ${file.type || 'desconocido'}`)
+  if (!heic && !NATIVE_TYPES.includes(blob.type)) {
+    throw new DecodeError(`Formato no soportado: ${blob.type || 'desconocido'}`)
   }
 
   let decoded: ImageBitmap
@@ -93,9 +100,13 @@ export async function loadImageFile(file: File): Promise<LoadedImage> {
 
   return {
     bitmap,
-    name: file.name.replace(/\.[^.]+$/, '') || 'imagen',
+    name: name.replace(/\.[^.]+$/, '') || 'imagen',
     originalWidth,
     originalHeight,
     downscaled: bitmap.width !== originalWidth,
   }
+}
+
+export function loadImageFile(file: File): Promise<LoadedImage> {
+  return decodeBlob(file, file.name)
 }

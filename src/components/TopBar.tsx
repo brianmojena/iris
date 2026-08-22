@@ -15,8 +15,8 @@ export function TopBar({ onExport, onCompareChange, comparing }: TopBarProps) {
   const openFile = useEditor((s) => s.openFile)
   const undo = useEditor((s) => s.undo)
   const redo = useEditor((s) => s.redo)
-  const canUndo = useEditor((s) => s.past.length > 0)
-  const canRedo = useEditor((s) => s.future.length > 0)
+  const canUndo = useEditor((s) => s.index > 0)
+  const canRedo = useEditor((s) => s.index < s.history.length - 1)
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (

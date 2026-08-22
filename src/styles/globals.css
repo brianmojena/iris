@@ -579,6 +579,139 @@ button:disabled {
   color: #fff;
 }
 
+/* Chips with a delete affordance need a wrapper to hang it off. */
+.chip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.chip-wrap:hover .chip__remove,
+.chip__remove:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.chip__remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--text);
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.chip--ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-style: dashed;
+  color: var(--text-faint);
+}
+
+.preset-form {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 9px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+/* ── History ────────────────────────────────────────────────────────────── */
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.history__step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-muted);
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.history__step:hover {
+  background: var(--canvas-bg);
+}
+
+.history__step[aria-current='step'] {
+  background: var(--canvas-bg);
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Steps ahead of the pointer are still reachable, just visibly spent. */
+.history__step--undone {
+  color: var(--text-faint);
+}
+
+.history__step--undone .history__dot {
+  background: transparent;
+  border-color: var(--border-strong);
+}
+
+.history__dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--text-faint);
+  background: var(--text-faint);
+}
+
+.history__step[aria-current='step'] .history__dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(28, 27, 25, 0.1);
+}
+
+/* The line joining the dots into a timeline. */
+.history li + li .history__step::before {
+  content: '';
+  position: absolute;
+  left: 11.5px;
+  top: -6px;
+  width: 1px;
+  height: 12px;
+  background: var(--border);
+}
+
+.history__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .panel__row {
   display: flex;
   gap: 4px;
@@ -847,6 +980,22 @@ button:disabled {
 
   .slider__track {
     height: 30px;
+  }
+
+  /* Steps are a touch target on a phone, not just a line of text. */
+  .history__step {
+    min-height: 44px;
+    padding: 8px;
+  }
+
+  .history li + li .history__step::before {
+    height: 16px;
+    top: -8px;
+  }
+
+  .chip,
+  .tabs__tab {
+    height: 36px;
   }
 
   .slider__thumb {
