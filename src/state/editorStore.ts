@@ -6,6 +6,7 @@ import { BUILT_IN_PRESETS, type Preset } from '../types/presets'
 import { INITIAL_LABEL, describeChange, type StepLabel } from '../lib/describe'
 import { dict, fill } from '../i18n'
 import { loadImageFile, decodeBlob, type LoadedImage } from '../lib/decode'
+import type { ColorSpace } from '../lib/colorSpace'
 import * as storage from '../lib/storage'
 import type { ExportOptions } from '../lib/export'
 
@@ -77,6 +78,20 @@ function freshEdit(width: number, height: number): Edit {
   return { adjustments: { ...DEFAULT_ADJUSTMENTS }, geometry: defaultGeometry(width, height) }
 }
 
+/**
+ * The colour space a photo should export in unless told otherwise.
+ *
+ * It follows the picture rather than sticking as a preference, because unlike
+ * format or quality this is not a matter of taste — it is a property of what is
+ * in the file. A photo carrying colours sRGB cannot hold would lose them on the
+ * way out; one that fits inside sRGB gains nothing from a wider tag and only
+ * takes on the risk of some service stripping the profile and leaving the
+ * numbers to be read as something they are not.
+ */
+function defaultColorSpace(image: LoadedImage): ColorSpace {
+  return image.wideGamut ? 'display-p3' : 'srgb'
+}
+
 /** The file the current session was restored from or opened with. */
 let sessionFile: { blob: Blob; name: string } | null = null
 let saveTimer: ReturnType<typeof setTimeout> | undefined
@@ -138,6 +153,7 @@ export const useEditor = create<EditorState>((set, get) => ({
           history: saved.history,
           index,
           snapshot: null,
+          exportOptions: { ...get().exportOptions, colorSpace: defaultColorSpace(image) },
           notice: { kind: 'info', message: dict().notices.sessionRestored },
         })
       } catch {
@@ -167,6 +183,7 @@ export const useEditor = create<EditorState>((set, get) => ({
         history,
         index: 0,
         snapshot: null,
+        exportOptions: { ...get().exportOptions, colorSpace: defaultColorSpace(image) },
         notice: image.downscaled
           ? {
               kind: 'info',

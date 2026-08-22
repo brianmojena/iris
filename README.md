@@ -144,12 +144,21 @@ came with that:
   changing what the pipeline computed. Preview and export keep running identical
   shader maths; only the final encoding differs.
 
-Export defaults to **sRGB**, because that is what every previous export was and
-what every viewer handles. Display P3 is one click away, and the dialog says so
-only when the photo really does hold colours sRGB would clip — a warning that
-fires on every photo is a warning nobody reads. That test measures actual pixel
-content rather than trusting the ICC tag, because plenty of P3-tagged files sit
-entirely inside sRGB and lose nothing on the way out.
+**The export space follows the photo.** A picture carrying colours sRGB cannot
+hold defaults to Display P3, because exporting it narrower would throw something
+away. A picture that fits inside sRGB defaults to sRGB, because a wider tag buys
+it nothing and only adds the risk of some service stripping the profile and
+leaving the numbers to be read as something they are not.
+
+Unlike format and quality, this is not a matter of taste that should stick as a
+preference — it is a property of what is in the file, so it is recomputed for
+each photo. The selector overrides it either way, and the dialog explains the
+cost only when you choose to narrow a photo that would actually lose something. A
+warning that fires on every photo is a warning nobody reads.
+
+That decision measures actual pixel content rather than trusting the ICC tag,
+because plenty of P3-tagged files sit entirely inside sRGB and lose nothing on
+the way out.
 
 ### History and the session
 

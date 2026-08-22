@@ -151,11 +151,19 @@ dos detalles:
   nunca cambiando lo que el pipeline calculó. Vista previa y exportación siguen
   ejecutando la misma matemática; solo difiere la codificación final.
 
-La exportación va por defecto en **sRGB**, porque es lo que fueron todas las
-anteriores y lo que cualquier visor maneja. Display P3 está a un clic, y el
-diálogo lo menciona solo cuando la foto tiene de verdad colores que sRGB
-recortaría — un aviso que salta en todas las fotos es un aviso que nadie lee. Esa
-comprobación mide el contenido real de los píxeles en vez de fiarse de la
+**El espacio de exportación sigue a la foto.** Una imagen con colores que sRGB no
+puede contener sale por defecto en Display P3, porque exportarla más estrecha
+tiraría algo. Una que cabe entera en sRGB sale en sRGB, porque una etiqueta más
+ancha no le aporta nada y solo añade el riesgo de que algún servicio elimine el
+perfil y deje los números para ser leídos como lo que no son.
+
+A diferencia del formato o la calidad, esto no es cuestión de gusto que deba
+quedarse pegada como preferencia: es una propiedad de lo que hay en el archivo,
+así que se recalcula con cada foto. El selector lo fuerza en cualquier dirección,
+y el diálogo explica el coste solo cuando eliges estrechar una foto que de verdad
+perdería algo. Un aviso que salta en todas es un aviso que nadie lee.
+
+Esa decisión mide el contenido real de los píxeles en vez de fiarse de la
 etiqueta ICC, porque muchos archivos etiquetados como P3 caben enteros en sRGB y
 no pierden nada al salir.
 

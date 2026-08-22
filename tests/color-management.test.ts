@@ -4,6 +4,27 @@ import { LUMA, hasWideGamutContent, supportsWideGamut, workingSpace } from '../s
 import { renderToBlob } from '../src/lib/export'
 import { DEFAULT_ADJUSTMENTS } from '../src/types/adjustments'
 import { defaultGeometry } from '../src/types/geometry'
+import { useEditor } from '../src/state/editorStore'
+
+async function wideGamutFile(size = 64): Promise<File> {
+  const canvas = new OffscreenCanvas(size, size)
+  const context = canvas.getContext('2d', { colorSpace: 'display-p3' })!
+  context.fillStyle = 'color(display-p3 1 0 0)'
+  context.fillRect(0, 0, size, size)
+  return new File([await canvas.convertToBlob({ type: 'image/png' })], 'p3.png', {
+    type: 'image/png',
+  })
+}
+
+async function narrowGamutFile(size = 64): Promise<File> {
+  const canvas = new OffscreenCanvas(size, size)
+  const context = canvas.getContext('2d')!
+  context.fillStyle = 'rgb(200, 90, 40)'
+  context.fillRect(0, 0, size, size)
+  return new File([await canvas.convertToBlob({ type: 'image/png' })], 'srgb.png', {
+    type: 'image/png',
+  })
+}
 
 /** A photo holding colours sRGB cannot reach. */
 async function wideGamutImage(size = 64) {
@@ -95,6 +116,37 @@ describe('gestión de color', () => {
     context.drawImage(decoded, 0, 0)
     const [r] = context.getImageData(8, 8, 1, 1, { colorSpace: 'display-p3' }).data
     expect(r).toBeGreaterThan(250)
+  })
+
+  /**
+   * El espacio de exportación sigue a la foto, no se queda pegado como una
+   * preferencia: a diferencia del formato o la calidad, esto no es cuestión de
+   * gusto sino una propiedad de lo que hay en el archivo.
+   */
+  test('el espacio de exportación por defecto lo decide la foto', async () => {
+    if (!supportsWideGamut()) return
+
+    await useEditor.getState().openFile(await wideGamutFile())
+    expect(useEditor.getState().exportOptions.colorSpace).toBe('display-p3')
+
+    await useEditor.getState().openFile(await narrowGamutFile())
+    expect(useEditor.getState().exportOptions.colorSpace).toBe('srgb')
+  })
+
+  test('elegir el espacio a mano no lo pisa hasta abrir otra foto', async () => {
+    if (!supportsWideGamut()) return
+    await useEditor.getState().openFile(await narrowGamutFile())
+    useEditor.getState().setExportOptions({ colorSpace: 'display-p3' })
+    expect(useEditor.getState().exportOptions.colorSpace).toBe('display-p3')
+  })
+
+  test('el formato y la calidad sí sobreviven a abrir otra foto', async () => {
+    // Esos sí son preferencias, y deben comportarse como tales.
+    useEditor.getState().setExportOptions({ format: 'image/webp', quality: 0.7 })
+    await useEditor.getState().openFile(await narrowGamutFile())
+    const { format, quality } = useEditor.getState().exportOptions
+    expect(format).toBe('image/webp')
+    expect(quality).toBe(0.7)
   })
 
   test('exportar en sRGB reduce la gama, que es lo pedido', async () => {
