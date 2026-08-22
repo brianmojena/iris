@@ -118,6 +118,12 @@ export const en: Dictionary = {
     working: 'Exporting…',
     dimensions: '{width} × {height} px',
     label: 'Export image',
+    colorSpace: 'Colour space',
+    srgb: 'sRGB',
+    displayP3: 'Display P3',
+    wideGamutNote: 'This photo holds colours sRGB cannot represent. Export as Display P3 to keep them.',
+    srgbHint: 'Works everywhere. The safe choice for the web.',
+    p3Hint: 'Keeps the wide gamut. Best for modern displays.',
   },
 
   stage: {

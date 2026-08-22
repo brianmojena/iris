@@ -70,6 +70,11 @@ export class Program {
     if (loc) this.gl.uniform2f(loc, x, y)
   }
 
+  setVec3(name: string, x: number, y: number, z: number): void {
+    const loc = this.location(name)
+    if (loc) this.gl.uniform3f(loc, x, y, z)
+  }
+
   setInt(name: string, value: number): void {
     const loc = this.location(name)
     if (loc) this.gl.uniform1i(loc, value)

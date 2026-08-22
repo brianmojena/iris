@@ -126,6 +126,39 @@ lo destaparon al comprobar que el hash «malo» no falla ningún test. El hash
 actual se mantiene por un motivo distinto y honesto: la precisión de `sin()`
 varía entre drivers, y evitarlo hace el grano reproducible en cualquier GPU.
 
+### La gestión de color
+
+Iris trabaja en **Display P3** siempre que el navegador lo permite. P3 contiene
+sRGB por completo, así que una foto corriente no pierde nada al procesarse ahí,
+mientras que una de un móvil moderno conserva los colores que de verdad tiene.
+
+Lo que estaba roto era más estrecho de lo que parecía. La decodificación ya era
+correcta: `createImageBitmap` con `colorSpaceConversion: 'default'` conserva la
+gama de origen — es `'none'` quien la pierde, devolviendo valores crudos sin la
+etiqueta que decía qué significaban. La pérdida ocurría después, en WebGL: el
+búfer de dibujo es sRGB por defecto, así que un rojo P3 puro llegaba a pantalla
+como `[233, 52, 36]` en vez de `[255, 0, 0]`. Y cada ajuste se hacía entonces
+contra una versión que el archivo nunca contuvo.
+
+Fijar `drawingBufferColorSpace` y `unpackColorSpace` lo arregla. Con ello vienen
+dos detalles:
+
+- **Los pesos de luminancia dependen de las primarias.** Todos los controles
+  tonales trabajan sobre luminancia, y los de P3 son `(0,229 0,692 0,079)` frente
+  a los de sRGB `(0,213 0,715 0,072)`. Ahora son un uniform, no una constante del
+  shader.
+- **La exportación renderiza en el espacio de trabajo y convierte después**,
+  nunca cambiando lo que el pipeline calculó. Vista previa y exportación siguen
+  ejecutando la misma matemática; solo difiere la codificación final.
+
+La exportación va por defecto en **sRGB**, porque es lo que fueron todas las
+anteriores y lo que cualquier visor maneja. Display P3 está a un clic, y el
+diálogo lo menciona solo cuando la foto tiene de verdad colores que sRGB
+recortaría — un aviso que salta en todas las fotos es un aviso que nadie lee. Esa
+comprobación mide el contenido real de los píxeles en vez de fiarse de la
+etiqueta ICC, porque muchos archivos etiquetados como P3 caben enteros en sRGB y
+no pierden nada al salir.
+
 ### El historial y la sesión
 
 El historial es **una lista con un puntero**, no dos pilas. Deshacer y rehacer

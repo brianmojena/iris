@@ -14,7 +14,8 @@ npm run dev
 
 ## What it does
 
-Fifteen controls across light, colour, detail and effects. A crop editor with
+Fifteen controls across light, colour, detail and effects. Colour-managed:
+it works in Display P3, so a wide-gamut photo keeps the colours it arrived with. A crop editor with
 fixed ratios, straightening, quarter turns and flips. A navigable history panel.
 Your own presets alongside six that ship with it. Your session comes back on its
 own when you return. The interface speaks English and Spanish.
@@ -118,6 +119,37 @@ measurement was reading a region that, inverted, showed different content. The
 tests in phase 6 exposed it by showing that the "bad" hash fails nothing. The
 current hash stays for a different and honest reason: the precision of `sin()`
 varies between drivers, and avoiding it makes grain reproducible on any GPU.
+
+### Colour management
+
+Iris works in **Display P3** wherever the browser allows it. P3 contains sRGB
+entirely, so an ordinary photo loses nothing by being processed there, while a
+photo from a modern phone keeps the colours it actually has.
+
+What was actually broken was narrower than it looked. Decoding was already fine:
+`createImageBitmap` with `colorSpaceConversion: 'default'` preserves the source
+gamut — it is `'none'` that loses it, by handing back raw values stripped of the
+tag that said what they meant. The loss happened later, in WebGL: a drawing
+buffer defaults to sRGB, so a pure P3 red reached the screen as
+`[233, 52, 36]` instead of `[255, 0, 0]`. Every adjustment was then being made
+against a rendition the file never contained.
+
+Setting `drawingBufferColorSpace` and `unpackColorSpace` fixes it. Two details
+came with that:
+
+- **Luminance weights depend on the primaries.** Every tone control works on
+  luminance, and P3's weights are `(0.229, 0.692, 0.079)` against sRGB's
+  `(0.213, 0.715, 0.072)`. They are a uniform now, not a constant in the shader.
+- **Export renders in the working space and converts afterwards**, never by
+  changing what the pipeline computed. Preview and export keep running identical
+  shader maths; only the final encoding differs.
+
+Export defaults to **sRGB**, because that is what every previous export was and
+what every viewer handles. Display P3 is one click away, and the dialog says so
+only when the photo really does hold colours sRGB would clip — a warning that
+fires on every photo is a warning nobody reads. That test measures actual pixel
+content rather than trusting the ICC tag, because plenty of P3-tagged files sit
+entirely inside sRGB and lose nothing on the way out.
 
 ### History and the session
 

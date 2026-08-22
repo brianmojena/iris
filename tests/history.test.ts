@@ -84,6 +84,9 @@ describe('diccionarios', () => {
     'Original',
     'JPEG · PNG · WebP · HEIC',
     '{width} × {height} px',
+    // Nombres de estándares de color: no se traducen en ningún idioma.
+    'sRGB',
+    'Display P3',
   ]
 
   test('no queda ninguna cadena sin traducir', () => {

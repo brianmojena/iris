@@ -24,7 +24,9 @@ uniform float u_grain;     // 0..1
 /** Render size over full export size, so grain keeps a sane cell at any zoom. */
 uniform float u_pixelScale;
 
-const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+/** Luminance weights of the working space; the primaries decide them. */
+uniform vec3 u_luma;
+#define LUMA u_luma
 
 /** 3×3 Gaussian, the reference blur for the unsharp mask. */
 vec3 softened(vec2 uv) {

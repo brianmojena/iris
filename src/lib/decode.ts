@@ -1,4 +1,5 @@
 import { dict, fill } from '../i18n'
+import { hasWideGamutContent } from './colorSpace'
 
 export class DecodeError extends Error {}
 
@@ -11,6 +12,8 @@ export interface LoadedImage {
   originalHeight: number
   /** Set when the image had to be shrunk to fit GPU limits. */
   downscaled: boolean
+  /** True when the photo holds colours sRGB cannot represent. */
+  wideGamut: boolean
 }
 
 const NATIVE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/bmp']
@@ -106,6 +109,7 @@ export async function decodeBlob(blob: Blob, name: string): Promise<LoadedImage>
     originalWidth,
     originalHeight,
     downscaled: bitmap.width !== originalWidth,
+    wideGamut: await hasWideGamutContent(bitmap),
   }
 }
 

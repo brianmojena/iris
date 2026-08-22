@@ -9,6 +9,7 @@ import { needsEffectPasses, type Adjustments } from '../types/adjustments'
 import { outputSize, sourceTransform, type CropRect, type Geometry } from '../types/geometry'
 import { identity } from '../lib/matrix'
 import { dict } from '../i18n'
+import { LUMA, workingSpace, type ColorSpace } from '../lib/colorSpace'
 
 /** Blur radius in source pixels when the slider is at 100. */
 const MAX_BLUR_RADIUS = 40
@@ -66,7 +67,17 @@ export class Renderer {
   private sourceWidth = 0
   private sourceHeight = 0
 
-  constructor(private readonly canvas: HTMLCanvasElement | OffscreenCanvas) {
+  private readonly colorSpace: ColorSpace
+
+  /**
+   * `colorSpace` is the space the drawing buffer presents in and that uploaded
+   * images are converted to. It defaults to the widest the browser supports;
+   * the export path overrides it only when asked for something narrower.
+   */
+  constructor(
+    private readonly canvas: HTMLCanvasElement | OffscreenCanvas,
+    colorSpace: ColorSpace = workingSpace(),
+  ) {
     const gl = canvas.getContext('webgl2', {
       alpha: true,
       antialias: false,
@@ -77,6 +88,17 @@ export class Renderer {
 
     if (!gl) throw new RendererError(dict().notices.noWebgl)
     this.gl = gl
+    this.colorSpace = colorSpace
+
+    // Without these two the buffer is sRGB, and a wide-gamut photo is silently
+    // rendered as its nearest sRGB neighbour. Guarded because older browsers do
+    // not know the properties at all.
+    try {
+      if ('drawingBufferColorSpace' in gl) gl.drawingBufferColorSpace = colorSpace
+      if ('unpackColorSpace' in gl) gl.unpackColorSpace = colorSpace
+    } catch {
+      /* stays sRGB, which is the correct fallback */
+    }
 
     this.base = new Program(gl, QUAD_VERT, ADJUSTMENTS_FRAG)
     this.denoise = new Program(gl, QUAD_VERT, DENOISE_FRAG)
@@ -232,6 +254,7 @@ export class Renderer {
     this.finish.setFloat('u_vignette', adjustments.vignette / 100)
     this.finish.setFloat('u_grain', adjustments.grain / 100)
     this.finish.setFloat('u_pixelScale', pixelScale)
+    this.finish.setVec3('u_luma', ...LUMA[this.colorSpace])
     this.draw()
   }
 
@@ -257,6 +280,7 @@ export class Renderer {
     this.base.setFloat('u_bypass', options.bypass ? 1 : 0)
     this.base.setFloat('u_dither', ownsDithering ? 1 : 0)
     this.base.setVec2('u_resolution', width, height)
+    this.base.setVec3('u_luma', ...LUMA[this.colorSpace])
     this.base.setMat3(
       'u_transform',
       options.geometry

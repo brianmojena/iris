@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useEditor } from '../state/editorStore'
 import { outputSize } from '../types/geometry'
 import { fill, useDict } from '../i18n'
+import { EXPORT_SPACES, supportsWideGamut, type ColorSpace } from '../lib/colorSpace'
 import {
   EXPORT_FORMATS,
   downloadBlob,
@@ -124,6 +125,29 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </div>
+
+          {/* Only offered where the browser can actually present a wide gamut;
+              elsewhere the choice would be a control that does nothing. */}
+          {supportsWideGamut() && (
+            <div className="field">
+              <span className="field__label">{t.export.colorSpace}</span>
+              <div className="segmented">
+                {EXPORT_SPACES.map((space) => (
+                  <button
+                    key={space}
+                    aria-pressed={options.colorSpace === space}
+                    title={space === 'srgb' ? t.export.srgbHint : t.export.p3Hint}
+                    onClick={() => setExportOptions({ colorSpace: space as ColorSpace })}
+                  >
+                    {space === 'srgb' ? t.export.srgb : t.export.displayP3}
+                  </button>
+                ))}
+              </div>
+              {image.wideGamut && options.colorSpace === 'srgb' && (
+                <p className="field__note">{t.export.wideGamutNote}</p>
+              )}
+            </div>
+          )}
 
           {lossy && (
             <div className="field">

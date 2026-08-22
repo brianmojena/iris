@@ -118,7 +118,7 @@ export const useEditor = create<EditorState>((set, get) => ({
 
   presets: BUILT_IN_PRESETS,
 
-  exportOptions: { format: 'image/jpeg', quality: 0.92, maxEdge: null },
+  exportOptions: { format: 'image/jpeg', quality: 0.92, maxEdge: null, colorSpace: 'srgb' },
   isExporting: false,
 
   restoreSession() {

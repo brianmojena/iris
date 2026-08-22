@@ -938,6 +938,13 @@ button:disabled {
   color: var(--text-muted);
 }
 
+.field__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .segmented {
   display: flex;
   gap: 3px;

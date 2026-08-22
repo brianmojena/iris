@@ -44,6 +44,10 @@ src/components/ the interface
 tests/          render regression, in a real browser
 ```
 
+Everything renders in the working colour space — Display P3 where the browser
+supports it, sRGB otherwise. Anything that reads pixels back has to say which
+space it wants them in, or the numbers will not mean what you assume.
+
 Preview and export run through the same `Renderer` at different sizes. Please
 keep it that way — a second render path is a second thing to keep in sync, and it
 will eventually disagree with what the user was looking at.

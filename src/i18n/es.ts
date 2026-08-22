@@ -121,6 +121,12 @@ export const es = {
     working: 'Exportando…',
     dimensions: '{width} × {height} px',
     label: 'Exportar imagen',
+    colorSpace: 'Espacio de color',
+    srgb: 'sRGB',
+    displayP3: 'Display P3',
+    wideGamutNote: 'Esta foto tiene colores que sRGB no puede representar. Exporta en Display P3 para conservarlos.',
+    srgbHint: 'Compatible con todo. La opción segura para la web.',
+    p3Hint: 'Conserva la gama ancha. Ideal para pantallas modernas.',
   },
 
   stage: {

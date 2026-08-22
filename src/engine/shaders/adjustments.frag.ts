@@ -36,7 +36,9 @@ uniform vec2  u_resolution;  // for output dithering
 /** 1.0 when this pass writes straight to the screen and owns the dithering. */
 uniform float u_dither;
 
-const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+/** Luminance weights of the working space; the primaries decide them. */
+uniform vec3 u_luma;
+#define LUMA u_luma
 
 vec3 srgbToLinear(vec3 c) {
   return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));

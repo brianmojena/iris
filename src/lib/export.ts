@@ -1,5 +1,7 @@
 import { Renderer } from '../engine/Renderer'
+import { dict } from '../i18n'
 import { outputSize } from '../types/geometry'
+import { workingSpace, type ColorSpace } from './colorSpace'
 import type { Edit } from '../state/editorStore'
 
 export type ExportFormat = 'image/jpeg' | 'image/png' | 'image/webp'
@@ -10,6 +12,8 @@ export interface ExportOptions {
   quality: number
   /** Longest edge in pixels. Null keeps the original size. */
   maxEdge: number | null
+  /** The space the file is tagged with. sRGB is the safe default everywhere. */
+  colorSpace: ColorSpace
 }
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string; extension: string }[] = [
@@ -54,24 +58,49 @@ export async function renderToBlob(
       ? new OffscreenCanvas(width, height)
       : Object.assign(document.createElement('canvas'), { width, height })
 
-  const renderer = new Renderer(canvas)
+  // Always render in the working space, so the export runs the exact same shader
+  // maths as the preview. Narrowing to sRGB, when asked for, happens afterwards
+  // as a conversion — never by quietly changing what the pipeline computed.
+  const renderer = new Renderer(canvas, workingSpace())
   try {
     renderer.setImage(bitmap)
     renderer.render(edit.adjustments, width, height, { geometry: edit.geometry })
 
-    if (canvas instanceof HTMLCanvasElement) {
+    const encodable =
+      options.colorSpace === workingSpace() ? canvas : convert(canvas, options.colorSpace)
+
+    if (encodable instanceof HTMLCanvasElement) {
       return await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => (blob ? resolve(blob) : reject(new Error('La exportación falló.'))),
+        encodable.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error(dict().notices.exportFailed))),
           options.format,
           options.quality,
         )
       })
     }
-    return await canvas.convertToBlob({ type: options.format, quality: options.quality })
+    return await encodable.convertToBlob({ type: options.format, quality: options.quality })
   } finally {
     renderer.dispose()
   }
+}
+
+/**
+ * Re-encodes a rendered canvas into another colour space.
+ *
+ * The browser owns the conversion, including how out-of-gamut colour is brought
+ * back in. Doing the matrix by hand here would be a second, worse implementation
+ * of something already sitting in the platform.
+ */
+function convert(source: HTMLCanvasElement | OffscreenCanvas, target: ColorSpace) {
+  const { width, height } = source
+  if (typeof OffscreenCanvas !== 'undefined') {
+    const canvas = new OffscreenCanvas(width, height)
+    canvas.getContext('2d', { colorSpace: target })?.drawImage(source, 0, 0)
+    return canvas
+  }
+  const canvas = Object.assign(document.createElement('canvas'), { width, height })
+  canvas.getContext('2d', { colorSpace: target })?.drawImage(source, 0, 0)
+  return canvas
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

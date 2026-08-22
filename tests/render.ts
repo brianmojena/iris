@@ -26,7 +26,16 @@ export function edit(
  * Deliberately the same entry point the export button uses: a test harness that
  * reimplements the render is a test of the harness.
  */
-export async function render(bitmap: ImageBitmap, source: Edit): Promise<Rendered> {
+export async function render(
+  bitmap: ImageBitmap,
+  source: Edit,
+  /**
+   * Which space to read the result back in. sRGB by default, so assertions read
+   * in the numbers everybody already has intuitions about; the colour-management
+   * tests ask for display-p3 to see the gamut the pipeline actually kept.
+   */
+  readAs: 'srgb' | 'display-p3' = 'srgb',
+): Promise<Rendered> {
   const { width, height } = outputSize(source.geometry, bitmap.width, bitmap.height)
   const canvas = new OffscreenCanvas(width, height)
   const renderer = new Renderer(canvas)
@@ -36,9 +45,13 @@ export async function render(bitmap: ImageBitmap, source: Edit): Promise<Rendere
     // Reading through a 2D context, because the drawing buffer of a WebGL canvas
     // is not guaranteed to survive past the current task.
     const readable = new OffscreenCanvas(width, height)
-    const context = readable.getContext('2d')!
+    const context = readable.getContext('2d', { colorSpace: readAs })!
     context.drawImage(canvas, 0, 0)
-    return { width, height, data: context.getImageData(0, 0, width, height).data }
+    return {
+      width,
+      height,
+      data: context.getImageData(0, 0, width, height, { colorSpace: readAs }).data,
+    }
   } finally {
     renderer.dispose()
   }
