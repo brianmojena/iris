@@ -14,7 +14,7 @@ export function stepText(label: StepLabel, t: Dictionary): string {
     case 'adjustment': {
       const spec = ADJUSTMENT_SPECS.find((s) => s.key === label.key)
       const name = t.adjustments[label.key]
-      return spec ? `${name} ${formatValue(spec, label.value)}` : name
+      return spec ? `${name} ${formatValue(spec, label.value, t.code)}` : name
     }
     case 'adjustmentsReset':
       return t.history.adjustmentsReset
@@ -29,7 +29,7 @@ export function stepText(label: StepLabel, t: Dictionary): string {
     case 'flip':
       return label.axis === 'horizontal' ? t.history.flipH : t.history.flipV
     case 'straighten':
-      return fill(t.history.straighten, { angle: formatNumber(label.angle, 1) })
+      return fill(t.history.straighten, { angle: formatNumber(label.angle, 1, t.code) })
     case 'aspect': {
       if (label.presetId === 'free') return t.history.aspectFree
       const preset = ASPECT_PRESETS.find((p) => p.id === label.presetId)

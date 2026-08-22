@@ -99,8 +99,14 @@ export function isDefault(a: Adjustments): boolean {
   )
 }
 
-/** Formats a value the way it is shown next to a slider, in the reader's locale. */
-export function formatValue(spec: SliderSpec, value: number): string {
-  const text = formatNumber(value, spec.decimals ?? 0)
+/**
+ * Formats a value the way it is shown next to a slider.
+ *
+ * The locale is a parameter, not a global read: history steps are rendered
+ * against a dictionary handed in by the caller, and the number has to agree with
+ * the words around it rather than with whatever the app happens to be set to.
+ */
+export function formatValue(spec: SliderSpec, value: number, locale?: string): string {
+  const text = formatNumber(value, spec.decimals ?? 0, locale)
   return spec.suffix ? `${text}${spec.suffix}` : text
 }

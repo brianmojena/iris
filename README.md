@@ -16,7 +16,7 @@ proporciones fijas y enderezado; panel de historial navegable; preajustes propio
 y de fábrica; la sesión se recupera sola al volver; y la interfaz habla español e
 inglés.
 
-Pendiente: pruebas de regresión de render y demo desplegada.
+Pendiente: demo desplegada y documentación en inglés.
 
 ## Cómo está construido
 
@@ -112,11 +112,15 @@ Tres detalles que costaron encontrar:
   shader voltea la coordenada para compensar que los bitmaps van de arriba abajo;
   con dos pasadas ese volteo se aplicaba una vez de más. Ahora es un uniform:
   solo voltea la pasada que lee el bitmap original.
-- El hash de ruido habitual, `sin`-`dot`-`fract`, se distribuye pésimamente con
-  entradas enteras —y los índices de celda del grano lo son—. No añadía textura:
-  desplazaba el brillo medio de un cielo liso en cincuenta niveles.
 - El grano se atenúa con la reducción de escala del preview. Sin eso, la vista
   previa mostraba mucho más grano del que acababa teniendo el archivo.
+
+Y una corrección: durante el desarrollo atribuí un desplazamiento del brillo
+medio al hash de ruido, y **era falso**. Lo causaba el volteo en Y de arriba; yo
+medía una zona que, invertida, mostraba otro contenido. Las pruebas de la fase 6
+lo destaparon al comprobar que el hash «malo» no falla ningún test. El hash
+actual se mantiene por un motivo distinto y honesto: la precisión de `sin()`
+varía entre drivers, y evitarlo hace el grano reproducible en cualquier GPU.
 
 ### El historial y la sesión
 
@@ -158,6 +162,29 @@ Lo que obligó a pensar:
   `+0,60` en español y `+0.60` en inglés, vía `Intl.NumberFormat`. Es el tipo de
   detalle pequeño que hace que una interfaz se sienta traducida en vez de
   escrita.
+
+## Pruebas
+
+```bash
+npx playwright install chromium   # una sola vez
+npm test
+```
+
+Treinta y siete pruebas que corren en un Chromium headless, en menos de un
+segundo. No hay pruebas de interfaz: el riesgo de este proyecto está en los
+shaders y en la geometría, y eso no se puede afirmar nada sobre ello en un DOM
+simulado. Cada prueba renderiza una imagen conocida por el mismo camino que usa
+el botón de exportar y comprueba estadísticas de píxeles.
+
+Las imágenes de prueba se construyen en código con un generador sembrado, no se
+guardan como ficheros: un binario en el repositorio es opaco al revisarlo y
+acaba desalineado de lo que pretendía demostrar.
+
+Las pruebas se validaron **reintroduciendo los fallos reales** que aparecieron
+durante el desarrollo, para comprobar que fallan cuando deben. Ese ejercicio
+encontró dos cosas: que el test del grano no detectaba nada porque medía sobre un
+degradado cuya pendiente enmascaraba el sesgo, y que uno de los diagnósticos del
+README era falso (ver la nota en «Las pasadas»).
 
 ## Formatos
 

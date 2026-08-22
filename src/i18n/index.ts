@@ -79,8 +79,9 @@ export function fill(template: string, values: Record<string, string | number>):
  * kind of small wrongness that makes an interface feel translated rather than
  * written.
  */
-export function formatNumber(value: number, decimals: number, locale = currentLocale()): string {
-  return new Intl.NumberFormat(locale === 'es' ? 'es-ES' : 'en-US', {
+export function formatNumber(value: number, decimals: number, locale?: string): string {
+  const resolved = locale ?? currentLocale()
+  return new Intl.NumberFormat(resolved === 'es' ? 'es-ES' : 'en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
     signDisplay: value === 0 ? 'never' : 'exceptZero',

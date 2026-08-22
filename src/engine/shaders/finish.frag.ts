@@ -44,10 +44,10 @@ vec3 softened(vec2 uv) {
 /**
  * Hash noise, uniform on 0..1.
  *
- * Not the usual sin-dot-fract one-liner: that variant is fed integer cell
- * indices here, and on integers its output clusters badly — enough to shift the
- * mean brightness of a flat sky rather than just texture it. This variant stays
- * evenly distributed on integer input.
+ * Not the usual sin-dot-fract one-liner. Measured on a flat field the two are
+ * equivalent, so this is not a bug fix — it is about portability. The precision
+ * of sin() is driver-dependent, and a grain pattern that changes character
+ * between GPUs is a grain pattern you cannot judge.
  */
 float hash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
