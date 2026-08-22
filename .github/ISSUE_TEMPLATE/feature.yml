@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest something Iris should be able to do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Iris is deliberately a single-image editor: adjustments, framing, detail
+        and effects. Layers, templates and AI editing were left out on purpose,
+        not overlooked.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: |
+        The photographic problem, not the control. "I cannot rescue a backlit
+        face" is more useful than "add a curves panel", because it may have a
+        better answer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you had in mind
+      description: Optional. How you imagine it working.

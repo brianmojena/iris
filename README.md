@@ -1,220 +1,221 @@
 # Iris
 
-Editor de fotos que funciona por completo en el navegador. No hay servidor, no hay
-cuentas y ninguna imagen sale del dispositivo.
+*English · [Español](README.es.md)*
+
+A photo editor that runs entirely in your browser. No server, no accounts, and no
+image ever leaves your device.
+
+**[Try it →](https://brianmojena.github.io/iris/)**
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Estado
+## What it does
 
-**MVP completo, más historial, persistencia e interfaz bilingüe.** Quince
-controles repartidos en luz, color, detalle y efectos; editor de recorte con
-proporciones fijas y enderezado; panel de historial navegable; preajustes propios
-y de fábrica; la sesión se recupera sola al volver; y la interfaz habla español e
-inglés.
+Fifteen controls across light, colour, detail and effects. A crop editor with
+fixed ratios, straightening, quarter turns and flips. A navigable history panel.
+Your own presets alongside six that ship with it. Your session comes back on its
+own when you return. The interface speaks English and Spanish.
 
-Pendiente: demo desplegada y documentación en inglés.
+## How it is built
 
-## Cómo está construido
-
-Todo el procesamiento ocurre en la GPU a través de un único paso de fragment
-shader. El estado de la edición es un objeto plano y serializable
-(`src/types/adjustments.ts`); ninguna herramienta toca píxeles, solo escribe en
-ese objeto. De ahí salen gratis la edición no destructiva, el historial y —más
-adelante— los ajustes preestablecidos y el copiar/pegar entre fotos.
+Everything happens on the GPU. The edit itself is a flat, serialisable object
+(`src/types/adjustments.ts`); no tool touches pixels, they only write into that
+object. Non-destructive editing, history and presets all fall out of that for
+free.
 
 ```
 src/
   engine/
-    Renderer.ts              contexto GL, textura de origen, cadena de pasadas
-    gl/program.ts            compilado, enlazado y caché de uniforms
-    gl/target.ts             superficies fuera de pantalla entre pasadas
-    shaders/                 el pipeline, en GLSL
-  i18n/                      diccionarios y detección de idioma
+    Renderer.ts              GL context, source texture, the chain of passes
+    gl/program.ts            compile, link, cache uniform locations
+    gl/target.ts             off-screen surfaces between passes
+    shaders/                 the pipeline, in GLSL
+  i18n/                      dictionaries and language detection
   lib/
-    decode.ts                apertura de archivos, HEIC, orientación EXIF
-    storage.ts               sesión y preajustes en IndexedDB
-    describe.ts              etiqueta cada paso del historial a partir del diff
-    export.ts                render a tamaño completo y descarga
-    matrix.ts                afín 3×3, en el orden que espera WebGL
-    crop.ts                  arrastre de tiradores y proporciones
-  types/geometry.ts          encuadre: giros, volteos, enderezado, recorte
-  state/editorStore.ts       estado, historial, deshacer/rehacer
-  components/                interfaz
+    decode.ts                opening files, HEIC, EXIF orientation
+    storage.ts               session and presets in IndexedDB
+    describe.ts              names each history step from the diff
+    export.ts                full-size render and download
+    matrix.ts                3×3 affine, in the order WebGL expects
+    crop.ts                  handle dragging and aspect ratios
+  types/geometry.ts          framing: turns, flips, straightening, crop
+  state/editorStore.ts       state, history, undo and redo
+  components/                the interface
 ```
 
-La vista previa y la exportación pasan por el **mismo** `Renderer` a distinto
-tamaño. No existe un segundo camino de render que pudiera divergir de lo que se
-ve en pantalla.
+Preview and export go through the **same** `Renderer` at different sizes. There
+is no second render path that could drift from what you see on screen.
 
-### El pipeline de color
+### The colour pipeline
 
-El orden imita al de un procesador raw:
+The order mirrors a raw processor:
 
-1. Se decodifica a luz lineal.
-2. Exposición y balance de blancos, que solo tienen sentido físico en lineal.
-3. Se vuelve a gamma de pantalla.
-4. Rango tonal, contraste y saturación, que son perceptuales.
+1. Decode to linear light.
+2. Exposure and white balance, which only mean anything physical in linear.
+3. Encode back to display gamma.
+4. Tonal range, contrast and saturation, which are perceptual.
 
-Las tres decisiones que costaron encontrar, documentadas en el shader:
+Three decisions that were expensive to arrive at, all documented in the shader:
 
-- Los ajustes tonales mueven la **luminancia** y reconstruyen el color por
-  escalado. Sumar un desplazamiento plano parece más simple pero dispara el croma
-  aparente al recuperar altas luces.
-- Ese escalado va **acotado al aclarar** (`MAX_GAIN`). Sin el tope, levantar un
-  píxel casi negro exige un factor de 20× o más, los canales saturan por separado
-  y el tono se invierte.
-- El croma **decae con la distancia recorrida** por el píxel. Conservarlo entero
-  al comprimir el rango produce un split-tone neón de manual.
+- Tone controls move **luminance** and rebuild the colour by scaling. Adding a
+  flat offset looks simpler but sends apparent chroma through the roof when
+  highlights are recovered.
+- That scaling is **capped when brightening** (`MAX_GAIN`). Without the cap,
+  lifting a near-black pixel demands a factor of 20 or more, the channels clip at
+  different points and the hue flips.
+- Chroma **decays with how far the pixel travelled**. Keeping it intact while
+  compressing the range produces a textbook neon split-tone.
 
-### El encuadre
+### The framing
 
-Recorte, giro, volteo y enderezado se resuelven en **una sola matriz 3×3** que el
-shader aplica a las coordenadas de textura. No se mueven píxeles y no hay pasos
-intermedios: la imagen se muestrea una vez, desde el original, sea cual sea la
-combinación de transformaciones. El borde inclinado que deja el enderezado se
-suaviza con `fwidth`, que da el tamaño de un píxel de salida medido en espacio de
-origen.
+Crop, rotation, flip and straightening all resolve into **a single 3×3 matrix**
+that the shader applies to texture coordinates. No pixels are moved and there are
+no intermediate steps: the image is sampled once, from the original, whatever the
+combination of transforms. The angled edge left by straightening is smoothed with
+`fwidth`, which gives the footprint of one output pixel measured in source space.
 
-Dos decisiones que no son evidentes:
+Two decisions that are not obvious:
 
-- `geometry.crop` guarda **lo que el usuario pidió**, no lo que se ve. El encuadre
-  real se calcula al vuelo ajustándolo al rectángulo inclinado. Si se recortara el
-  valor guardado, mover el control de enderezar de ida y vuelta iría comiéndose la
-  foto, porque ese ajuste solo sabe encoger.
-- El volteo se aplica **después** de los giros de 90°, de modo que «voltear
-  horizontalmente» siempre refleja izquierda-derecha en pantalla, con
-  independencia de cuántos cuartos de giro haya acumulados. Además invierte el
-  ángulo de enderezado, para que se refleje la composición entera y no solo su
-  contenido.
+- `geometry.crop` stores **what the user asked for**, not what is shown. The real
+  framing is computed on the fly by fitting it to the tilted rectangle. If the
+  stored value were trimmed instead, moving the straighten slider back and forth
+  would eat the photo a slice at a time, because fitting only knows how to
+  shrink.
+- The flip is applied **after** the quarter turns, so "flip horizontally" always
+  mirrors left-to-right on screen no matter how many turns have accumulated. It
+  also negates the straightening angle, so the whole composition is mirrored and
+  not just its contents.
 
-### Las pasadas
+### The passes
 
-El color se resuelve en una sola pasada. Nitidez, reducción de ruido y
-desenfoque no pueden: necesitan píxeles vecinos, así que cuando alguno entra en
-juego la cadena crece —color a una textura fuera de pantalla, luego las pasadas
-espaciales, luego una final a la pantalla—. Las pasadas que no tienen nada que
-hacer se saltan, de modo que una foto sin efectos sigue costando un solo
-`drawArrays`. Con la cadena completa a 3 MP el arrastre de un control se mantiene
-en 60 fps.
+Colour resolves in a single pass. Sharpening, noise reduction and blur cannot:
+they need neighbouring pixels, so when any of them is in play the chain grows —
+colour into an off-screen texture, then the spatial passes, then a final pass to
+the screen. Passes with nothing to do are skipped, so a photo with no effects
+still costs a single `drawArrays`. With the full chain at 3 MP, dragging a slider
+holds 60 fps.
 
-Las superficies intermedias son de 8 bits a propósito. Con media coma flotante se
-arrastraría algo más de precisión, pero una exportación de 24 megapíxeles necesita
-tres vivas a la vez, y a ocho bytes por píxel eso pasa de medio gigabyte de
-memoria de GPU para un archivo que el usuario espera simplemente guardar.
+The intermediate surfaces are eight bits per channel on purpose. Half floats
+would carry a little more precision, but a 24 megapixel export needs three of
+them live at once, and at eight bytes per pixel that is over half a gigabyte of
+GPU memory for a file the user expects to simply save.
 
-Tres detalles que costaron encontrar:
+Two details that were expensive to find:
 
-- Dibujar a un framebuffer **invierte Y** respecto a dibujar al canvas. El vertex
-  shader voltea la coordenada para compensar que los bitmaps van de arriba abajo;
-  con dos pasadas ese volteo se aplicaba una vez de más. Ahora es un uniform:
-  solo voltea la pasada que lee el bitmap original.
-- El grano se atenúa con la reducción de escala del preview. Sin eso, la vista
-  previa mostraba mucho más grano del que acababa teniendo el archivo.
+- Drawing into a framebuffer **flips Y** relative to drawing into the canvas. The
+  vertex shader flips the coordinate to compensate for bitmaps being stored top
+  down; with two passes that flip was applied once too often. It is a uniform
+  now, and only the pass that reads the original bitmap flips.
+- Grain is attenuated by the preview's downscaling. Without that, the preview
+  showed far heavier grain than the exported file ended up with.
 
-Y una corrección: durante el desarrollo atribuí un desplazamiento del brillo
-medio al hash de ruido, y **era falso**. Lo causaba el volteo en Y de arriba; yo
-medía una zona que, invertida, mostraba otro contenido. Las pruebas de la fase 6
-lo destaparon al comprobar que el hash «malo» no falla ningún test. El hash
-actual se mantiene por un motivo distinto y honesto: la precisión de `sin()`
-varía entre drivers, y evitarlo hace el grano reproducible en cualquier GPU.
+And a correction: during development a shift in mean brightness was blamed on the
+noise hash, and that was **wrong**. It was caused by the Y flip above — the
+measurement was reading a region that, inverted, showed different content. The
+tests in phase 6 exposed it by showing that the "bad" hash fails nothing. The
+current hash stays for a different and honest reason: the precision of `sin()`
+varies between drivers, and avoiding it makes grain reproducible on any GPU.
 
-### El historial y la sesión
+### History and the session
 
-El historial es **una lista con un puntero**, no dos pilas. Deshacer y rehacer
-mueven el puntero; el panel deja saltar a cualquier punto pinchándolo. Editar
-desde un punto intermedio descarta la rama que quedaba por delante, que es lo que
-hace cualquier editor y lo que la gente espera.
+History is **one list with a pointer**, not two stacks. Undo and redo move the
+pointer; the panel lets you jump to any step by clicking it. Editing from a
+middle point discards the branch that was ahead, which is what every editor does
+and what people expect.
 
-Las etiquetas de cada paso —«Exposición +0,30», «Giro a la derecha»— se **derivan
-del diff** entre estados, no se pasan a mano en cada llamada. Una etiqueta escrita
-a mano acaba, tarde o temprano, contando algo distinto de lo que el paso hizo.
+Each step's label — "Exposure +0.30", "Rotated right" — is **derived from the
+diff** between states rather than passed in by hand at every call site. A label
+written by hand eventually tells a different story from what the step did.
 
-Al cerrar la pestaña se guarda en IndexedDB el archivo original tal cual llegó,
-junto con la lista completa de pasos. Guardar solo el estado final habría
-devuelto la foto pero dejado el deshacer apuntando a nada, y «sigues donde lo
-dejaste» dejaría de ser cierto en cuanto pulsaras ⌘Z. La escritura va con retardo:
-guardar en cada movimiento de un control significaría serializar un blob de
-varios megabytes docenas de veces por segundo.
+Closing the tab saves the original file, exactly as it arrived, to IndexedDB
+along with the complete list of steps. Saving only the final state would bring
+the photo back but leave undo pointing at nothing, and "you are where you left
+off" would stop being true the moment you pressed ⌘Z. Writes are debounced:
+saving on every slider tick would mean serialising a multi-megabyte blob dozens
+of times a second.
 
-El almacenamiento es una comodidad, nunca un requisito. En navegación privada, con
-el disco lleno o con IndexedDB deshabilitado, cada operación se traga su fallo y
-el editor sigue funcionando en memoria.
+Storage is a convenience, never a requirement. In private browsing, with a full
+disk, or with IndexedDB disabled, every operation swallows its failure and the
+editor carries on in memory.
 
-### Los idiomas
+### The languages
 
-Sin librería: un diccionario tipado por idioma y unas 130 cadenas. El español es
-la fuente de la verdad y el inglés se tipa contra su forma, de modo que **olvidar
-una traducción es un error de compilación**, no una etiqueta en blanco en
-producción. Se detecta el idioma del navegador y la elección explícita se
-recuerda.
+No library: one typed dictionary per language, about 130 strings. Spanish is the
+source of truth and English is typed against its shape, so **forgetting a
+translation is a build error** rather than a blank label in production. The
+browser's language is detected and an explicit choice is remembered.
 
-Lo que obligó a pensar:
+What required actual thought:
 
-- Las etiquetas del historial **se guardan en disco**, así que no pueden ser
-  texto ya traducido: una sesión grabada en español seguiría hablando español
-  después de cambiar a inglés. Se guarda un descriptor —qué control, qué valor—
-  y el panel lo convierte en palabras al pintarlo.
-- Los números se escriben distinto en cada idioma. Los controles muestran
-  `+0,60` en español y `+0.60` en inglés, vía `Intl.NumberFormat`. Es el tipo de
-  detalle pequeño que hace que una interfaz se sienta traducida en vez de
-  escrita.
+- History labels are **written to disk**, so they cannot be finished text: a
+  session recorded in Spanish would still be speaking Spanish after a switch to
+  English. What is stored is a descriptor — which control, which value — and the
+  panel turns it into words as it draws.
+- Numbers are written differently in each language. Controls show `+0,60` in
+  Spanish and `+0.60` in English, via `Intl.NumberFormat`. It is the kind of
+  small wrongness that makes an interface feel translated rather than written.
 
-## Pruebas
+## Tests
 
 ```bash
-npx playwright install chromium   # una sola vez
+npx playwright install chromium   # once
 npm test
 ```
 
-Treinta y siete pruebas que corren en un Chromium headless, en menos de un
-segundo. No hay pruebas de interfaz: el riesgo de este proyecto está en los
-shaders y en la geometría, y eso no se puede afirmar nada sobre ello en un DOM
-simulado. Cada prueba renderiza una imagen conocida por el mismo camino que usa
-el botón de exportar y comprueba estadísticas de píxeles.
+Thirty-seven tests running in a headless Chromium, in under a second. There are
+no interface tests: the risk in this project lives in the shaders and the
+geometry, and there is nothing meaningful to assert about those in a simulated
+DOM. Each test renders a known image through the same path the export button uses
+and checks pixel statistics.
 
-Las imágenes de prueba se construyen en código con un generador sembrado, no se
-guardan como ficheros: un binario en el repositorio es opaco al revisarlo y
-acaba desalineado de lo que pretendía demostrar.
+Test images are built in code from a seeded generator rather than committed as
+files: a binary in the repository is opaque in review and drifts from whatever it
+was meant to prove.
 
-Las pruebas se validaron **reintroduciendo los fallos reales** que aparecieron
-durante el desarrollo, para comprobar que fallan cuando deben. Ese ejercicio
-encontró dos cosas: que el test del grano no detectaba nada porque medía sobre un
-degradado cuya pendiente enmascaraba el sesgo, y que uno de los diagnósticos del
-README era falso (ver la nota en «Las pasadas»).
+The tests were validated by **reintroducing the real bugs** that came up during
+development, to confirm they fail when they should. That exercise found two
+things: the grain test was detecting nothing, because it measured across a
+gradient whose own slope masked the bias; and one of the diagnoses in this README
+was false (see the note under "The passes").
 
-## Formatos
+## Formats
 
-Entrada: JPEG, PNG, WebP, AVIF y HEIC de iPhone. La decodificación HEIC usa
-WebAssembly y se carga bajo demanda: son unos 700 KB comprimidos que solo se
-descargan la primera vez que se abre un archivo de ese tipo.
+In: JPEG, PNG, WebP, AVIF, and HEIC from an iPhone. HEIC decoding uses
+WebAssembly loaded on demand — about 700 KB gzipped, downloaded only the first
+time you open such a file.
 
-Salida: JPEG, WebP o PNG, con calidad y tamaño máximo configurables. El tamaño
-que muestra el diálogo es el real, no una estimación.
+Out: JPEG, WebP or PNG, with quality and maximum size configurable. The size
+shown in the dialog is the real one, not an estimate.
 
-Las imágenes que superan el máximo de textura de la GPU se reducen al abrirlas y
-se avisa de ello.
+Images beyond the GPU's maximum texture size are reduced on opening, and you are
+told so.
 
-## Atajos
+## Shortcuts
 
 | | |
 |---|---|
-| `⌘Z` / `⇧⌘Z` | Deshacer y rehacer |
-| `⌘E` | Exportar |
-| `\` | Mantener pulsado para ver el original |
-| `C` | Entrar y salir del recorte |
-| `Esc` | Salir del recorte |
-| Doble clic en un slider | Devolverlo a su valor por defecto |
-| Doble clic en la foto | Alternar entre ajustar y 200% |
-| `←` `→` sobre un slider | Ajuste fino (`⇧` para pasos de diez) |
-| Pegar | Abre una imagen del portapapeles |
+| `⌘Z` / `⇧⌘Z` | Undo and redo |
+| `⌘E` | Export |
+| `\` | Hold to see the original |
+| `C` | Enter and leave the crop editor |
+| `Esc` | Leave the crop editor |
+| Double-click a slider | Return it to its default |
+| Double-click the photo | Toggle between fit and 200% |
+| `←` `→` on a slider | Fine adjustment (`⇧` for steps of ten) |
+| Paste | Opens an image from the clipboard |
 
-## Licencia
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). The short version: the pipeline is the
+interesting part, the tests are fast, and comments explain *why* rather than
+what.
+
+## Licence
 
 [MIT](LICENSE) — Copyright (c) 2026 Brian Mojena.
 
-Úsalo, modifícalo y distribúyelo con libertad, también con fines comerciales.
-Lo único que se pide es conservar el aviso de copyright.
+Use it, modify it and distribute it freely, commercially included. All that is
+asked is that you keep the copyright notice.

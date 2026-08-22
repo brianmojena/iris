@@ -1,0 +1,52 @@
+name: Bug report
+description: Something renders wrong, breaks, or behaves unexpectedly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Rendering bugs are often specific to a GPU or driver, so the browser and
+        machine details below matter more than they usually would.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      description: |
+        The settings that trigger it, ideally as slider values. If it depends on
+        a particular photo, what kind — very dark, very bright, wide gamut, HEIC?
+      placeholder: |
+        1. Open any photo
+        2. Shadows +60, Highlights -80
+        3. The dark areas turn teal
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Safari 18.2, Chrome 141, Firefox 134…
+    validations:
+      required: true
+
+  - type: input
+    id: machine
+    attributes:
+      label: Machine and GPU
+      placeholder: MacBook Air M2, Windows 11 with an RTX 3060, Pixel 8…
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: Anything in the browser console, if there is anything.
+      render: text
