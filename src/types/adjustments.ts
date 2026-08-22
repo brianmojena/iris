@@ -31,19 +31,34 @@ export const DEFAULT_ADJUSTMENTS: Adjustments = {
 
 export type AdjustmentKey = keyof Adjustments
 
-export interface AdjustmentSpec {
-  key: AdjustmentKey
+/** Everything the Slider component needs, independent of what it controls. */
+export interface SliderSpec {
   label: string
   min: number
   max: number
   step: number
   /** Slider fill grows outward from this value. */
   origin: number
+  decimals?: number
+  suffix?: string
+}
+
+export interface AdjustmentSpec extends SliderSpec {
+  key: AdjustmentKey
   group: 'light' | 'color'
 }
 
 export const ADJUSTMENT_SPECS: AdjustmentSpec[] = [
-  { key: 'exposure', label: 'Exposición', min: -5, max: 5, step: 0.01, origin: 0, group: 'light' },
+  {
+    key: 'exposure',
+    label: 'Exposición',
+    min: -5,
+    max: 5,
+    step: 0.01,
+    origin: 0,
+    decimals: 2,
+    group: 'light',
+  },
   { key: 'contrast', label: 'Contraste', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
   { key: 'highlights', label: 'Altas luces', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
   { key: 'shadows', label: 'Sombras', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
@@ -67,11 +82,9 @@ export function isDefault(a: Adjustments): boolean {
 }
 
 /** Formats a value the way it is shown next to a slider. */
-export function formatValue(spec: AdjustmentSpec, value: number): string {
-  if (spec.key === 'exposure') {
-    const s = value.toFixed(2)
-    return value > 0 ? `+${s}` : s
-  }
-  const r = Math.round(value)
-  return r > 0 ? `+${r}` : String(r)
+export function formatValue(spec: SliderSpec, value: number): string {
+  const rounded = Number(value.toFixed(spec.decimals ?? 0))
+  const text = rounded.toFixed(spec.decimals ?? 0)
+  const signed = rounded > 0 ? `+${text}` : text
+  return spec.suffix ? `${signed}${spec.suffix}` : signed
 }

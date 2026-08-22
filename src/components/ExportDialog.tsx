@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useEditor } from '../state/editorStore'
+import { outputSize } from '../types/geometry'
 import {
   EXPORT_FORMATS,
   downloadBlob,
@@ -19,7 +20,7 @@ const SIZE_PRESETS: { label: string; maxEdge: number | null }[] = [
 
 export function ExportDialog({ onClose }: { onClose: () => void }) {
   const image = useEditor((s) => s.image)
-  const adjustments = useEditor((s) => s.adjustments)
+  const edit = useEditor((s) => s.edit)
   const options = useEditor((s) => s.exportOptions)
   const setExportOptions = useEditor((s) => s.setExportOptions)
   const isExporting = useEditor((s) => s.isExporting)
@@ -45,7 +46,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     setSize(null)
     const timer = setTimeout(async () => {
       try {
-        const blob = await renderToBlob(image.bitmap, adjustments, options)
+        const blob = await renderToBlob(image.bitmap, edit, options)
         if (!cancelled) setSize(blob.size)
       } catch {
         if (!cancelled) setSize(null)
@@ -55,17 +56,18 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [image, adjustments, options])
+  }, [image, edit, options])
 
   if (!image) return null
 
-  const target = exportDimensions(image.bitmap.width, image.bitmap.height, options.maxEdge)
+  const cropped = outputSize(edit.geometry, image.bitmap.width, image.bitmap.height)
+  const target = exportDimensions(cropped.width, cropped.height, options.maxEdge)
   const lossy = options.format !== 'image/png'
 
   const handleExport = async () => {
     setExporting(true)
     try {
-      const blob = await renderToBlob(image.bitmap, adjustments, options)
+      const blob = await renderToBlob(image.bitmap, edit, options)
       downloadBlob(blob, `${image.name}-iris.${extensionFor(options.format)}`)
       onClose()
     } catch (error) {

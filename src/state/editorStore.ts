@@ -5,6 +5,7 @@ import {
   type AdjustmentKey,
   type Adjustments,
 } from '../types/adjustments'
+import { defaultGeometry, isDefaultGeometry, type Geometry } from '../types/geometry'
 import { loadImageFile, type LoadedImage } from '../lib/decode'
 import type { ExportOptions } from '../lib/export'
 
@@ -15,16 +16,25 @@ export interface Notice {
   message: string
 }
 
+/**
+ * Everything the user has done to the photo. Colour and framing travel together
+ * so that one undo steps back over one action, whichever panel it came from.
+ */
+export interface Edit {
+  adjustments: Adjustments
+  geometry: Geometry
+}
+
 interface EditorState {
   image: LoadedImage | null
   status: 'empty' | 'loading' | 'ready'
   notice: Notice | null
 
-  adjustments: Adjustments
+  edit: Edit
   /** Snapshot taken when a drag starts, so the whole gesture is one undo step. */
-  snapshot: Adjustments | null
-  past: Adjustments[]
-  future: Adjustments[]
+  snapshot: Edit | null
+  past: Edit[]
+  future: Edit[]
 
   exportOptions: ExportOptions
   isExporting: boolean
@@ -33,10 +43,12 @@ interface EditorState {
 
   startEdit: () => void
   setAdjustment: (key: AdjustmentKey, value: number) => void
+  setGeometry: (patch: Partial<Geometry>) => void
   endEdit: () => void
-  /** Applies a whole new set at once and records a single history entry. */
-  applyAdjustments: (next: Adjustments) => void
+  /** Applies a change and records it as a single history entry immediately. */
+  commit: (patch: Partial<Edit>) => void
   resetAdjustments: () => void
+  resetGeometry: () => void
 
   undo: () => void
   redo: () => void
@@ -46,8 +58,31 @@ interface EditorState {
   notify: (notice: Notice | null) => void
 }
 
-function sameAdjustments(a: Adjustments, b: Adjustments): boolean {
-  return (Object.keys(a) as AdjustmentKey[]).every((k) => a[k] === b[k])
+function sameGeometry(a: Geometry, b: Geometry): boolean {
+  return (
+    a.rotation === b.rotation &&
+    a.angle === b.angle &&
+    a.flipH === b.flipH &&
+    a.flipV === b.flipV &&
+    a.aspect === b.aspect &&
+    a.crop.cx === b.crop.cx &&
+    a.crop.cy === b.crop.cy &&
+    a.crop.width === b.crop.width &&
+    a.crop.height === b.crop.height
+  )
+}
+
+// Compared by value, not reference: a gesture that ends where it started should
+// not leave an undo step that appears to do nothing.
+function sameEdit(a: Edit, b: Edit): boolean {
+  if (!sameGeometry(a.geometry, b.geometry)) return false
+  return (Object.keys(a.adjustments) as AdjustmentKey[]).every(
+    (k) => a.adjustments[k] === b.adjustments[k],
+  )
+}
+
+function freshEdit(width: number, height: number): Edit {
+  return { adjustments: { ...DEFAULT_ADJUSTMENTS }, geometry: defaultGeometry(width, height) }
 }
 
 export const useEditor = create<EditorState>((set, get) => ({
@@ -55,7 +90,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   status: 'empty',
   notice: null,
 
-  adjustments: { ...DEFAULT_ADJUSTMENTS },
+  edit: freshEdit(1, 1),
   snapshot: null,
   past: [],
   future: [],
@@ -72,7 +107,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       set({
         image,
         status: 'ready',
-        adjustments: { ...DEFAULT_ADJUSTMENTS },
+        edit: freshEdit(image.bitmap.width, image.bitmap.height),
         snapshot: null,
         past: [],
         future: [],
@@ -96,58 +131,73 @@ export const useEditor = create<EditorState>((set, get) => ({
 
   startEdit() {
     if (get().snapshot) return
-    set({ snapshot: { ...get().adjustments } })
+    set({ snapshot: get().edit })
   },
 
   setAdjustment(key, value) {
-    set((state) => ({ adjustments: { ...state.adjustments, [key]: value } }))
+    set((state) => ({
+      edit: { ...state.edit, adjustments: { ...state.edit.adjustments, [key]: value } },
+    }))
+  },
+
+  setGeometry(patch) {
+    set((state) => ({ edit: { ...state.edit, geometry: { ...state.edit.geometry, ...patch } } }))
   },
 
   endEdit() {
-    const { snapshot, adjustments, past } = get()
+    const { snapshot, edit, past } = get()
     if (!snapshot) return
-    if (sameAdjustments(snapshot, adjustments)) {
+    if (sameEdit(snapshot, edit)) {
       set({ snapshot: null })
       return
     }
     set({ snapshot: null, past: [...past, snapshot].slice(-HISTORY_LIMIT), future: [] })
   },
 
-  applyAdjustments(next) {
-    const { adjustments, past } = get()
-    if (sameAdjustments(adjustments, next)) return
+  commit(patch) {
+    const { edit, past } = get()
+    const next = { ...edit, ...patch }
+    if (sameEdit(edit, next)) return
     set({
-      adjustments: next,
+      edit: next,
       snapshot: null,
-      past: [...past, adjustments].slice(-HISTORY_LIMIT),
+      past: [...past, edit].slice(-HISTORY_LIMIT),
       future: [],
     })
   },
 
   resetAdjustments() {
-    if (isDefault(get().adjustments)) return
-    get().applyAdjustments({ ...DEFAULT_ADJUSTMENTS })
+    if (isDefault(get().edit.adjustments)) return
+    get().commit({ adjustments: { ...DEFAULT_ADJUSTMENTS } })
+  },
+
+  resetGeometry() {
+    const { image, edit } = get()
+    if (!image) return
+    const { width, height } = image.bitmap
+    if (isDefaultGeometry(edit.geometry, width, height)) return
+    get().commit({ geometry: defaultGeometry(width, height) })
   },
 
   undo() {
-    const { past, future, adjustments } = get()
+    const { past, future, edit } = get()
     const previous = past.at(-1)
     if (!previous) return
     set({
-      adjustments: previous,
+      edit: previous,
       past: past.slice(0, -1),
-      future: [adjustments, ...future].slice(0, HISTORY_LIMIT),
+      future: [edit, ...future].slice(0, HISTORY_LIMIT),
       snapshot: null,
     })
   },
 
   redo() {
-    const { past, future, adjustments } = get()
+    const { past, future, edit } = get()
     const next = future[0]
     if (!next) return
     set({
-      adjustments: next,
-      past: [...past, adjustments].slice(-HISTORY_LIMIT),
+      edit: next,
+      past: [...past, edit].slice(-HISTORY_LIMIT),
       future: future.slice(1),
       snapshot: null,
     })

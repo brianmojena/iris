@@ -10,13 +10,13 @@ npm run dev
 
 ## Estado
 
-**Fase 1 completa.** Carga de imagen, motor de render WebGL2, los diez ajustes
-básicos de luz y color, zoom y desplazamiento, comparación con el original,
-historial y exportación.
+**Fases 1 y 2 completas.** Carga de imagen, motor de render WebGL2, los diez
+ajustes básicos de luz y color, zoom y desplazamiento, comparación con el
+original, historial, exportación, y el editor de recorte: proporciones fijas,
+enderezado, giros de 90° y volteos.
 
-Pendiente para las siguientes fases: recorte y geometría, detalle y efectos
-(nitidez, ruido, grano, viñeta), panel de historial visible y persistencia de
-proyectos en IndexedDB.
+Pendiente: detalle y efectos (nitidez, ruido, grano, viñeta), panel de historial
+visible y persistencia de proyectos en IndexedDB.
 
 ## Cómo está construido
 
@@ -31,10 +31,13 @@ src/
   engine/
     Renderer.ts              contexto GL, textura de origen, un draw call
     gl/program.ts            compilado, enlazado y caché de uniforms
-    shaders/                 el pipeline de color, en GLSL
+    shaders/                 el pipeline de color y encuadre, en GLSL
   lib/
     decode.ts                apertura de archivos, HEIC, orientación EXIF
     export.ts                render a tamaño completo y descarga
+    matrix.ts                afín 3×3, en el orden que espera WebGL
+    crop.ts                  arrastre de tiradores y proporciones
+  types/geometry.ts          encuadre: giros, volteos, enderezado, recorte
   state/editorStore.ts       estado, historial, deshacer/rehacer
   components/                interfaz
 ```
@@ -63,6 +66,27 @@ Las tres decisiones que costaron encontrar, documentadas en el shader:
 - El croma **decae con la distancia recorrida** por el píxel. Conservarlo entero
   al comprimir el rango produce un split-tone neón de manual.
 
+### El encuadre
+
+Recorte, giro, volteo y enderezado se resuelven en **una sola matriz 3×3** que el
+shader aplica a las coordenadas de textura. No se mueven píxeles y no hay pasos
+intermedios: la imagen se muestrea una vez, desde el original, sea cual sea la
+combinación de transformaciones. El borde inclinado que deja el enderezado se
+suaviza con `fwidth`, que da el tamaño de un píxel de salida medido en espacio de
+origen.
+
+Dos decisiones que no son evidentes:
+
+- `geometry.crop` guarda **lo que el usuario pidió**, no lo que se ve. El encuadre
+  real se calcula al vuelo ajustándolo al rectángulo inclinado. Si se recortara el
+  valor guardado, mover el control de enderezar de ida y vuelta iría comiéndose la
+  foto, porque ese ajuste solo sabe encoger.
+- El volteo se aplica **después** de los giros de 90°, de modo que «voltear
+  horizontalmente» siempre refleja izquierda-derecha en pantalla, con
+  independencia de cuántos cuartos de giro haya acumulados. Además invierte el
+  ángulo de enderezado, para que se refleje la composición entera y no solo su
+  contenido.
+
 ## Formatos
 
 Entrada: JPEG, PNG, WebP, AVIF y HEIC de iPhone. La decodificación HEIC usa
@@ -82,6 +106,8 @@ se avisa de ello.
 | `⌘Z` / `⇧⌘Z` | Deshacer y rehacer |
 | `⌘E` | Exportar |
 | `\` | Mantener pulsado para ver el original |
+| `C` | Entrar y salir del recorte |
+| `Esc` | Salir del recorte |
 | Doble clic en un slider | Devolverlo a su valor por defecto |
 | Doble clic en la foto | Alternar entre ajustar y 200% |
 | `←` `→` sobre un slider | Ajuste fino (`⇧` para pasos de diez) |

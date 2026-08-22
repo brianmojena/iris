@@ -17,6 +17,8 @@ in vec2 v_uv;
 out vec4 fragColor;
 
 uniform sampler2D u_image;
+/** Maps this pass's texture coordinates onto the source image. */
+uniform mat3 u_transform;
 
 uniform float u_exposure;    // EV stops
 uniform float u_contrast;    // -1..1
@@ -110,10 +112,25 @@ float dither(vec2 p) {
 }
 
 void main() {
-  vec4 src = texture(u_image, v_uv);
+  vec2 uv = (u_transform * vec3(v_uv, 1.0)).xy;
 
+  // Straightening leaves the source rectangle at an angle, so the output has
+  // corners with nothing behind them. fwidth gives the footprint of one output
+  // pixel in source space, which turns the cut into a clean antialiased edge
+  // instead of a staircase.
+  vec2 edge = min(uv, 1.0 - uv);
+  vec2 feather = max(fwidth(uv), vec2(1e-6));
+  float coverage = min(smoothstep(0.0, feather.x, edge.x), smoothstep(0.0, feather.y, edge.y));
+  if (coverage <= 0.0) {
+    fragColor = vec4(0.0);
+    return;
+  }
+
+  vec4 src = texture(u_image, clamp(uv, 0.0, 1.0));
+
+  // The comparison view keeps the framing and drops only the colour work.
   if (u_bypass > 0.5) {
-    fragColor = src;
+    fragColor = vec4(src.rgb, src.a * coverage);
     return;
   }
 
@@ -156,6 +173,6 @@ void main() {
 
   c += dither(gl_FragCoord.xy / max(u_resolution, vec2(1.0))) / 255.0;
 
-  fragColor = vec4(clamp(c, 0.0, 1.0), src.a);
+  fragColor = vec4(clamp(c, 0.0, 1.0), src.a * coverage);
 }
 `

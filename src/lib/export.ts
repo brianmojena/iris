@@ -1,5 +1,6 @@
 import { Renderer } from '../engine/Renderer'
-import type { Adjustments } from '../types/adjustments'
+import { outputSize } from '../types/geometry'
+import type { Edit } from '../state/editorStore'
 
 export type ExportFormat = 'image/jpeg' | 'image/png' | 'image/webp'
 
@@ -42,10 +43,11 @@ export function exportDimensions(
  */
 export async function renderToBlob(
   bitmap: ImageBitmap,
-  adjustments: Adjustments,
+  edit: Edit,
   options: ExportOptions,
 ): Promise<Blob> {
-  const { width, height } = exportDimensions(bitmap.width, bitmap.height, options.maxEdge)
+  const cropped = outputSize(edit.geometry, bitmap.width, bitmap.height)
+  const { width, height } = exportDimensions(cropped.width, cropped.height, options.maxEdge)
 
   const canvas =
     typeof OffscreenCanvas !== 'undefined'
@@ -55,7 +57,7 @@ export async function renderToBlob(
   const renderer = new Renderer(canvas)
   try {
     renderer.setImage(bitmap)
-    renderer.render(adjustments, width, height)
+    renderer.render(edit.adjustments, width, height, { geometry: edit.geometry })
 
     if (canvas instanceof HTMLCanvasElement) {
       return await new Promise<Blob>((resolve, reject) => {

@@ -10,7 +10,7 @@ import { IconDownload, IconReset } from './icons'
 
 export function AdjustmentsPanel({ onExport }: { onExport: () => void }) {
   const image = useEditor((s) => s.image)
-  const adjustments = useEditor((s) => s.adjustments)
+  const adjustments = useEditor((s) => s.edit.adjustments)
   const startEdit = useEditor((s) => s.startEdit)
   const setAdjustment = useEditor((s) => s.setAdjustment)
   const endEdit = useEditor((s) => s.endEdit)

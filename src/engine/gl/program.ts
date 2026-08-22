@@ -73,6 +73,11 @@ export class Program {
     if (loc) this.gl.uniform1i(loc, value)
   }
 
+  setMat3(name: string, value: Float32Array): void {
+    const loc = this.location(name)
+    if (loc) this.gl.uniformMatrix3fv(loc, false, value)
+  }
+
   dispose(): void {
     this.gl.deleteProgram(this.handle)
   }

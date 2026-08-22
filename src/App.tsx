@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AdjustmentsPanel } from './components/AdjustmentsPanel'
+import { GeometryPanel } from './components/GeometryPanel'
 import { CanvasView } from './components/CanvasView'
 import { Dropzone } from './components/Dropzone'
 import { ExportDialog } from './components/ExportDialog'
 import { TopBar } from './components/TopBar'
-import { IconClose } from './components/icons'
+import { IconClose, IconCrop, IconSliders } from './components/icons'
 import { useEditor } from './state/editorStore'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
 
   const [exporting, setExporting] = useState(false)
   const [comparing, setComparing] = useState(false)
+  const [tab, setTab] = useState<'adjust' | 'crop'>('adjust')
   // Drag events bubble through every child, so track enter/leave depth.
   const dragDepth = useRef(0)
   const [draggingOver, setDraggingOver] = useState(false)
@@ -43,6 +45,10 @@ export default function App() {
         openExport()
       } else if (event.key === '\\' && !event.repeat) {
         setComparing(true)
+      } else if (event.key.toLowerCase() === 'c' && !mod && image) {
+        setTab((current) => (current === 'crop' ? 'adjust' : 'crop'))
+      } else if (event.key === 'Escape') {
+        setTab('adjust')
       }
     }
     const onKeyUp = (event: KeyboardEvent) => {
@@ -106,8 +112,32 @@ export default function App() {
       <TopBar onExport={openExport} onCompareChange={setComparing} comparing={comparing} />
 
       <div className="workspace">
-        {image ? <CanvasView showOriginal={comparing} /> : <Dropzone />}
-        <AdjustmentsPanel onExport={openExport} />
+        {image ? <CanvasView showOriginal={comparing} cropMode={tab === 'crop'} /> : <Dropzone />}
+
+        <div className="panel-host">
+          <nav className="tabs" aria-label="Herramientas">
+            <button
+              className="tabs__tab"
+              aria-pressed={tab === 'adjust'}
+              onClick={() => setTab('adjust')}
+            >
+              <IconSliders /> Ajustes
+            </button>
+            <button
+              className="tabs__tab"
+              aria-pressed={tab === 'crop'}
+              onClick={() => setTab('crop')}
+            >
+              <IconCrop /> Recorte
+            </button>
+          </nav>
+
+          {tab === 'adjust' ? (
+            <AdjustmentsPanel onExport={openExport} />
+          ) : (
+            <GeometryPanel onDone={() => setTab('adjust')} />
+          )}
+        </div>
       </div>
 
       {image && draggingOver && (

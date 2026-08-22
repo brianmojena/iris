@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
-import { formatValue, type AdjustmentSpec } from '../types/adjustments'
+import { formatValue, type SliderSpec } from '../types/adjustments'
 
 interface SliderProps {
-  spec: AdjustmentSpec
+  spec: SliderSpec
   value: number
   defaultValue: number
   onStart: () => void

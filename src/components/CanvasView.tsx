@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Renderer } from '../engine/Renderer'
 import { useEditor } from '../state/editorStore'
+import { straightenedBounds, turnedSize } from '../types/geometry'
+import { CropOverlay } from './CropOverlay'
 import { IconFit, IconMinus, IconPlus } from './icons'
 
 /** Zoom is expressed as a multiple of "fits the viewport". */
@@ -26,9 +28,16 @@ function distance(a: PointerEvent | React.PointerEvent, b: PointerEvent | React.
   return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
 }
 
-export function CanvasView({ showOriginal }: { showOriginal: boolean }) {
+interface CanvasViewProps {
+  showOriginal: boolean
+  /** While cropping, the whole straightened image is shown and zoom is locked. */
+  cropMode: boolean
+}
+
+export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
   const image = useEditor((s) => s.image)
-  const adjustments = useEditor((s) => s.adjustments)
+  const adjustments = useEditor((s) => s.edit.adjustments)
+  const geometry = useEditor((s) => s.edit.geometry)
 
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -63,13 +72,22 @@ export function CanvasView({ showOriginal }: { showOriginal: boolean }) {
     return () => observer.disconnect()
   }, [])
 
-  // A fresh image starts fitted.
+  // A fresh image, and entering or leaving the crop editor, all start fitted.
   useEffect(() => {
     setView(FIT)
-  }, [image])
+  }, [image, cropMode])
 
-  const contentWidth = image?.bitmap.width ?? 1
-  const contentHeight = image?.bitmap.height ?? 1
+  const sourceWidth = image?.bitmap.width ?? 1
+  const sourceHeight = image?.bitmap.height ?? 1
+  const turned = turnedSize(geometry, sourceWidth, sourceHeight)
+
+  // What the canvas shows: the crop normally, the whole straightened image —
+  // rotated corners included — while the crop editor is open.
+  const bounds = cropMode
+    ? straightenedBounds(geometry, sourceWidth, sourceHeight)
+    : { width: geometry.crop.width, height: geometry.crop.height }
+  const contentWidth = bounds.width * turned.width
+  const contentHeight = bounds.height * turned.width
 
   const fitScale =
     image && stageSize.width > 0
@@ -176,11 +194,26 @@ export function CanvasView({ showOriginal }: { showOriginal: boolean }) {
 
       renderer.render(adjustments, Math.max(width, 1), Math.max(height, 1), {
         bypass: showOriginal,
+        geometry,
+        cropOverride: cropMode
+          ? { cx: 0, cy: 0, width: bounds.width, height: bounds.height }
+          : undefined,
       })
     })
 
     return () => cancelAnimationFrame(frameRef.current)
-  }, [adjustments, image, displayWidth, displayHeight, contentWidth, showOriginal])
+  }, [
+    adjustments,
+    geometry,
+    image,
+    displayWidth,
+    displayHeight,
+    contentWidth,
+    showOriginal,
+    cropMode,
+    bounds.width,
+    bounds.height,
+  ])
 
   // The browser may drop the GL context under memory pressure; recover instead
   // of leaving the user staring at a blank rectangle.
@@ -213,7 +246,7 @@ export function CanvasView({ showOriginal }: { showOriginal: boolean }) {
 
   useEffect(() => {
     const stage = stageRef.current
-    if (!stage) return
+    if (!stage || cropMode) return
 
     // Registered manually because React's onWheel is passive and cannot
     // preventDefault the browser's own pinch-zoom.
@@ -230,10 +263,10 @@ export function CanvasView({ showOriginal }: { showOriginal: boolean }) {
 
     stage.addEventListener('wheel', onWheel, { passive: false })
     return () => stage.removeEventListener('wheel', onWheel)
-  }, [image, zoomAt])
+  }, [image, zoomAt, cropMode])
 
   const handlePointerDown = (event: React.PointerEvent) => {
-    if (!image) return
+    if (!image || cropMode) return
     pointers.current.set(event.pointerId, event)
     try {
       ;(event.target as Element).setPointerCapture?.(event.pointerId)
@@ -326,7 +359,9 @@ export function CanvasView({ showOriginal }: { showOriginal: boolean }) {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      onDoubleClick={() => setView((c) => (c.zoom > 1 ? FIT : { zoom: 2, x: 0, y: 0 }))}
+      onDoubleClick={() => {
+        if (!cropMode) setView((c) => (c.zoom > 1 ? FIT : { zoom: 2, x: 0, y: 0 }))
+      }}
     >
       <canvas
         ref={canvasRef}
@@ -335,13 +370,26 @@ export function CanvasView({ showOriginal }: { showOriginal: boolean }) {
           width: displayWidth ? `${displayWidth}px` : undefined,
           height: displayHeight ? `${displayHeight}px` : undefined,
           transform: `translate3d(${view.x}px, ${view.y}px, 0)`,
-          cursor: view.zoom > 1 ? (panning ? 'grabbing' : 'grab') : 'default',
+          cursor: !cropMode && view.zoom > 1 ? (panning ? 'grabbing' : 'grab') : 'default',
+          // The straightened image is drawn with transparent corners, so the
+          // drop shadow would trace the canvas box instead of the picture.
+          boxShadow: cropMode ? 'none' : undefined,
         }}
       />
 
+      {image && cropMode && (
+        <CropOverlay
+          displayWidth={displayWidth}
+          displayHeight={displayHeight}
+          boundsWidth={bounds.width}
+          sourceWidth={sourceWidth}
+          sourceHeight={sourceHeight}
+        />
+      )}
+
       {showOriginal && <div className="stage__badge">Original</div>}
 
-      {image && (
+      {image && !cropMode && (
         <div className="stage__hud">
           <button
             className="btn btn--icon"

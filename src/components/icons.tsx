@@ -85,3 +85,53 @@ export const IconFit = ({ size = 16 }: IconProps) => (
   </svg>
 )
 
+export const IconCrop = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M5.5 2v12.5H18" />
+    <path d="M2 5.5h12.5V18" />
+  </svg>
+)
+
+export const IconSliders = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M3 6.5h9M15 6.5h2M3 13.5h2M8 13.5h9" />
+    <circle cx="13.5" cy="6.5" r="1.75" />
+    <circle cx="6.5" cy="13.5" r="1.75" />
+  </svg>
+)
+
+export const IconRotateLeft = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M4 7.5A6.5 6.5 0 1 1 3.5 11" />
+    <path d="M2.5 4v3.5H6" />
+  </svg>
+)
+
+export const IconRotateRight = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M16 7.5A6.5 6.5 0 1 0 16.5 11" />
+    <path d="M17.5 4v3.5H14" />
+  </svg>
+)
+
+export const IconFlipH = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M10 2.5v15" strokeDasharray="2 2" />
+    <path d="M7.5 5.5 3 10l4.5 4.5z" />
+    <path d="M12.5 5.5 17 10l-4.5 4.5z" />
+  </svg>
+)
+
+export const IconFlipV = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M2.5 10h15" strokeDasharray="2 2" />
+    <path d="M5.5 7.5 10 3l4.5 4.5z" />
+    <path d="M5.5 12.5 10 17l4.5-4.5z" />
+  </svg>
+)
+
+export const IconCheck = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+  </svg>
+)

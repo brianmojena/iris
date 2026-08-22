@@ -2,6 +2,8 @@ import { Program } from './gl/program'
 import { QUAD_VERT } from './shaders/quad.vert'
 import { ADJUSTMENTS_FRAG } from './shaders/adjustments.frag'
 import type { Adjustments } from '../types/adjustments'
+import { sourceTransform, type CropRect, type Geometry } from '../types/geometry'
+import { identity } from '../lib/matrix'
 
 /**
  * Slider units are chosen for humans; the shader wants -1..1. This is the only
@@ -106,15 +108,19 @@ export class Renderer {
   }
 
   /**
-   * Draws the current image with `adjustments` into a canvas of `width`×`height`
-   * device pixels. Pass `bypass` to render the untouched original, which is what
-   * the before/after comparison uses.
+   * Draws the current image into a canvas of `width`×`height` device pixels.
+   *
+   * `geometry` decides which part of the source lands on screen; omit it and the
+   * whole image is drawn untransformed. `cropOverride` renders a different
+   * rectangle than the one stored — the crop editor uses it to show the entire
+   * straightened image while the stored crop is still just a selection.
+   * `bypass` skips the colour pipeline for the before/after comparison.
    */
   render(
     adjustments: Adjustments,
     width: number,
     height: number,
-    options: { bypass?: boolean } = {},
+    options: { bypass?: boolean; geometry?: Geometry; cropOverride?: CropRect } = {},
   ): void {
     const gl = this.gl
     if (!this.texture) return
@@ -134,6 +140,17 @@ export class Renderer {
     this.program.setInt('u_image', 0)
     this.program.setFloat('u_bypass', options.bypass ? 1 : 0)
     this.program.setVec2('u_resolution', width, height)
+    this.program.setMat3(
+      'u_transform',
+      options.geometry
+        ? sourceTransform(
+            options.geometry,
+            this.sourceWidth,
+            this.sourceHeight,
+            options.cropOverride,
+          )
+        : identity(),
+    )
 
     for (const [name, value] of Object.entries(toUniforms(adjustments))) {
       this.program.setFloat(name, value)
