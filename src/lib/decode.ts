@@ -1,3 +1,5 @@
+import { dict, fill } from '../i18n'
+
 export class DecodeError extends Error {}
 
 export interface LoadedImage {
@@ -31,10 +33,7 @@ async function decodeHeic(blob: Blob): Promise<Blob> {
   try {
     return await heicTo({ blob, type: 'image/png' })
   } catch (cause) {
-    throw new DecodeError(
-      'No se pudo leer el archivo HEIC. Puede estar dañado o usar una variante no soportada.',
-      { cause },
-    )
+    throw new DecodeError(dict().notices.heicFailed, { cause })
   }
 }
 
@@ -79,7 +78,10 @@ export async function decodeBlob(blob: Blob, name: string): Promise<LoadedImage>
   const source: Blob = heic ? await decodeHeic(blob) : blob
 
   if (!heic && !NATIVE_TYPES.includes(blob.type)) {
-    throw new DecodeError(`Formato no soportado: ${blob.type || 'desconocido'}`)
+    const t = dict()
+    throw new DecodeError(fill(t.notices.unsupportedFormat, {
+      type: blob.type || t.notices.unknownFormat,
+    }))
   }
 
   let decoded: ImageBitmap
@@ -91,7 +93,7 @@ export async function decodeBlob(blob: Blob, name: string): Promise<LoadedImage>
       premultiplyAlpha: 'none',
     })
   } catch (cause) {
-    throw new DecodeError('No se pudo abrir la imagen.', { cause })
+    throw new DecodeError(dict().notices.openFailed, { cause })
   }
 
   const originalWidth = decoded.width

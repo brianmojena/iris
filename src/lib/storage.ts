@@ -1,4 +1,5 @@
 import type { Edit } from '../types/edit'
+import type { StepLabel } from './describe'
 
 const DATABASE = 'iris'
 const VERSION = 1
@@ -16,7 +17,7 @@ export interface StoredSession {
    * where you left off" would stop being true the moment you pressed ⌘Z.
    * Plain JSON: a couple of hundred kilobytes at the history limit.
    */
-  history: { edit: Edit; label: string }[]
+  history: { edit: Edit; label: StepLabel }[]
   index: number
   savedAt: number
 }

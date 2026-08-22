@@ -3,6 +3,8 @@
  * this object and nothing else — that is what makes editing non-destructive and
  * makes history, presets and (later) batch copy/paste trivial.
  */
+import { formatNumber } from '../i18n'
+
 export interface Adjustments {
   exposure: number // EV stops, -5..5
   contrast: number // -100..100
@@ -45,9 +47,11 @@ export const DEFAULT_ADJUSTMENTS: Adjustments = {
 
 export type AdjustmentKey = keyof Adjustments
 
-/** Everything the Slider component needs, independent of what it controls. */
+/**
+ * The numeric shape of a slider. No label: those live in the dictionaries, so a
+ * control cannot end up hard-coded into one language.
+ */
 export interface SliderSpec {
-  label: string
   min: number
   max: number
   step: number
@@ -65,46 +69,24 @@ export interface AdjustmentSpec extends SliderSpec {
 }
 
 export const ADJUSTMENT_SPECS: AdjustmentSpec[] = [
-  {
-    key: 'exposure',
-    label: 'Exposición',
-    min: -5,
-    max: 5,
-    step: 0.01,
-    origin: 0,
-    decimals: 2,
-    group: 'light',
-  },
-  { key: 'contrast', label: 'Contraste', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
-  { key: 'highlights', label: 'Altas luces', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
-  { key: 'shadows', label: 'Sombras', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
-  { key: 'whites', label: 'Blancos', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
-  { key: 'blacks', label: 'Negros', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
-  { key: 'temperature', label: 'Temperatura', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
-  { key: 'tint', label: 'Matiz', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
-  { key: 'vibrance', label: 'Intensidad', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
-  { key: 'saturation', label: 'Saturación', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
-  { key: 'sharpness', label: 'Nitidez', min: 0, max: 100, step: 1, origin: 0, group: 'detail' },
-  {
-    key: 'denoise',
-    label: 'Reducción de ruido',
-    min: 0,
-    max: 100,
-    step: 1,
-    origin: 0,
-    group: 'detail',
-  },
-  { key: 'blur', label: 'Desenfoque', min: 0, max: 100, step: 1, origin: 0, group: 'detail' },
-  { key: 'vignette', label: 'Viñeta', min: -100, max: 100, step: 1, origin: 0, group: 'effects' },
-  { key: 'grain', label: 'Grano', min: 0, max: 100, step: 1, origin: 0, group: 'effects' },
+  { key: 'exposure', min: -5, max: 5, step: 0.01, origin: 0, decimals: 2, group: 'light' },
+  { key: 'contrast', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
+  { key: 'highlights', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
+  { key: 'shadows', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
+  { key: 'whites', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
+  { key: 'blacks', min: -100, max: 100, step: 1, origin: 0, group: 'light' },
+  { key: 'temperature', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
+  { key: 'tint', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
+  { key: 'vibrance', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
+  { key: 'saturation', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
+  { key: 'sharpness', min: 0, max: 100, step: 1, origin: 0, group: 'detail' },
+  { key: 'denoise', min: 0, max: 100, step: 1, origin: 0, group: 'detail' },
+  { key: 'blur', min: 0, max: 100, step: 1, origin: 0, group: 'detail' },
+  { key: 'vignette', min: -100, max: 100, step: 1, origin: 0, group: 'effects' },
+  { key: 'grain', min: 0, max: 100, step: 1, origin: 0, group: 'effects' },
 ]
 
-export const ADJUSTMENT_GROUPS: { id: AdjustmentGroup; label: string }[] = [
-  { id: 'light', label: 'Luz' },
-  { id: 'color', label: 'Color' },
-  { id: 'detail', label: 'Detalle' },
-  { id: 'effects', label: 'Efectos' },
-]
+export const ADJUSTMENT_GROUPS: AdjustmentGroup[] = ['light', 'color', 'detail', 'effects']
 
 /** True when no pass beyond the base colour pass has anything to do. */
 export function needsEffectPasses(a: Adjustments): boolean {
@@ -117,10 +99,8 @@ export function isDefault(a: Adjustments): boolean {
   )
 }
 
-/** Formats a value the way it is shown next to a slider. */
+/** Formats a value the way it is shown next to a slider, in the reader's locale. */
 export function formatValue(spec: SliderSpec, value: number): string {
-  const rounded = Number(value.toFixed(spec.decimals ?? 0))
-  const text = rounded.toFixed(spec.decimals ?? 0)
-  const signed = rounded > 0 ? `+${text}` : text
-  return spec.suffix ? `${signed}${spec.suffix}` : signed
+  const text = formatNumber(value, spec.decimals ?? 0)
+  return spec.suffix ? `${text}${spec.suffix}` : text
 }

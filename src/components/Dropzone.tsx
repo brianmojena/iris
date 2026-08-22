@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react'
 import { ACCEPTED_FILE_TYPES } from '../lib/decode'
 import { useEditor } from '../state/editorStore'
+import { useDict } from '../i18n'
 import { IconImage } from './icons'
 
 export function Dropzone() {
   const openFile = useEditor((s) => s.openFile)
   const status = useEditor((s) => s.status)
   const inputRef = useRef<HTMLInputElement>(null)
+  const t = useDict()
   const [over, setOver] = useState(false)
   // Drag events fire for every child element, so we count instead of toggling.
   const depth = useRef(0)
@@ -42,21 +44,21 @@ export function Dropzone() {
           <IconImage />
         </div>
         <p className="dropzone__title">
-          {status === 'loading' ? 'Abriendo…' : 'Arrastra una foto aquí'}
+          {status === 'loading' ? t.app.opening : t.dropzone.title}
         </p>
         <p className="dropzone__hint">
-          o{' '}
+          {t.dropzone.or}{' '}
           <button
             className="btn"
             style={{ height: 'auto', padding: 0, textDecoration: 'underline' }}
             onClick={() => inputRef.current?.click()}
           >
-            selecciona un archivo
+            {t.dropzone.choose}
           </button>
           <br />
-          Todo se procesa en tu dispositivo. Nada se sube a ningún servidor.
+          {t.dropzone.privacy}
         </p>
-        <p className="dropzone__formats">JPEG · PNG · WebP · HEIC</p>
+        <p className="dropzone__formats">{t.dropzone.formats}</p>
         <input
           ref={inputRef}
           type="file"

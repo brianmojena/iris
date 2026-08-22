@@ -10,12 +10,13 @@ npm run dev
 
 ## Estado
 
-**MVP completo, más historial y persistencia.** Quince controles repartidos en
-luz, color, detalle y efectos; editor de recorte con proporciones fijas y
-enderezado; panel de historial navegable; preajustes propios y de fábrica; y la
-sesión se recupera sola al volver.
+**MVP completo, más historial, persistencia e interfaz bilingüe.** Quince
+controles repartidos en luz, color, detalle y efectos; editor de recorte con
+proporciones fijas y enderezado; panel de historial navegable; preajustes propios
+y de fábrica; la sesión se recupera sola al volver; y la interfaz habla español e
+inglés.
 
-Pendiente: interfaz bilingüe, pruebas de regresión de render, y demo desplegada.
+Pendiente: pruebas de regresión de render y demo desplegada.
 
 ## Cómo está construido
 
@@ -32,6 +33,7 @@ src/
     gl/program.ts            compilado, enlazado y caché de uniforms
     gl/target.ts             superficies fuera de pantalla entre pasadas
     shaders/                 el pipeline, en GLSL
+  i18n/                      diccionarios y detección de idioma
   lib/
     decode.ts                apertura de archivos, HEIC, orientación EXIF
     storage.ts               sesión y preajustes en IndexedDB
@@ -137,6 +139,25 @@ varios megabytes docenas de veces por segundo.
 El almacenamiento es una comodidad, nunca un requisito. En navegación privada, con
 el disco lleno o con IndexedDB deshabilitado, cada operación se traga su fallo y
 el editor sigue funcionando en memoria.
+
+### Los idiomas
+
+Sin librería: un diccionario tipado por idioma y unas 130 cadenas. El español es
+la fuente de la verdad y el inglés se tipa contra su forma, de modo que **olvidar
+una traducción es un error de compilación**, no una etiqueta en blanco en
+producción. Se detecta el idioma del navegador y la elección explícita se
+recuerda.
+
+Lo que obligó a pensar:
+
+- Las etiquetas del historial **se guardan en disco**, así que no pueden ser
+  texto ya traducido: una sesión grabada en español seguiría hablando español
+  después de cambiar a inglés. Se guarda un descriptor —qué control, qué valor—
+  y el panel lo convierte en palabras al pintarlo.
+- Los números se escriben distinto en cada idioma. Los controles muestran
+  `+0,60` en español y `+0.60` en inglés, vía `Intl.NumberFormat`. Es el tipo de
+  detalle pequeño que hace que una interfaz se sienta traducida en vez de
+  escrita.
 
 ## Formatos
 

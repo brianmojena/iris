@@ -1,59 +1,59 @@
-import {
-  ADJUSTMENT_SPECS,
-  formatValue,
-  isDefault,
-  type AdjustmentKey,
-} from '../types/adjustments'
+import { isDefault, type AdjustmentKey } from '../types/adjustments'
 import { ASPECT_PRESETS, type Geometry } from '../types/geometry'
 import { changedAdjustments, type Edit } from '../types/edit'
 
-export const INITIAL_LABEL = 'Original'
-
-function specFor(key: AdjustmentKey) {
-  return ADJUSTMENT_SPECS.find((spec) => spec.key === key)
-}
-
 /**
- * Names a geometry change the way the user would describe it, picking the most
- * significant difference when several moved at once — a quarter turn also drags
- * the crop with it, but "Giro a la derecha" is what actually happened.
+ * What a history step did, described rather than worded.
+ *
+ * Steps are written to IndexedDB, so storing them as finished sentences would
+ * freeze a session into whatever language it was recorded in — switch to English
+ * and your own history would still be talking Spanish. The panel turns these
+ * into text at the moment it draws them.
  */
-function describeGeometry(from: Geometry, to: Geometry): string {
+export type StepLabel =
+  | { kind: 'initial' }
+  | { kind: 'adjustment'; key: AdjustmentKey; value: number }
+  | { kind: 'adjustmentsReset' }
+  | { kind: 'adjustmentsMultiple' }
+  | { kind: 'preset'; presetId: string; name?: string }
+  | { kind: 'rotate'; clockwise: boolean }
+  | { kind: 'flip'; axis: 'horizontal' | 'vertical' }
+  | { kind: 'straighten'; angle: number }
+  | { kind: 'aspect'; presetId: string | null }
+  | { kind: 'crop' }
+  | { kind: 'geometryReset' }
+  /** Anything restored from a session recorded before labels were structured. */
+  | { kind: 'text'; text: string }
+
+export const INITIAL_LABEL: StepLabel = { kind: 'initial' }
+
+function describeGeometry(from: Geometry, to: Geometry): StepLabel {
   if (from.rotation !== to.rotation) {
-    return (from.rotation + 90) % 360 === to.rotation ? 'Giro a la derecha' : 'Giro a la izquierda'
+    return { kind: 'rotate', clockwise: (from.rotation + 90) % 360 === to.rotation }
   }
-  if (from.flipH !== to.flipH) return 'Volteo horizontal'
-  if (from.flipV !== to.flipV) return 'Volteo vertical'
-  if (from.angle !== to.angle) {
-    const value = to.angle > 0 ? `+${to.angle.toFixed(1)}` : to.angle.toFixed(1)
-    return `Enderezado ${value}°`
-  }
+  if (from.flipH !== to.flipH) return { kind: 'flip', axis: 'horizontal' }
+  if (from.flipV !== to.flipV) return { kind: 'flip', axis: 'vertical' }
+  if (from.angle !== to.angle) return { kind: 'straighten', angle: to.angle }
   if (from.aspect !== to.aspect) {
-    if (to.aspect === null) return 'Proporción libre'
+    if (to.aspect === null) return { kind: 'aspect', presetId: 'free' }
     const preset = ASPECT_PRESETS.find(
       (p) => typeof p.ratio === 'number' && Math.abs(p.ratio - to.aspect!) < 1e-3,
     )
-    return `Proporción ${preset?.label ?? 'personalizada'}`
+    return { kind: 'aspect', presetId: preset?.id ?? null }
   }
-  return 'Recorte'
+  return { kind: 'crop' }
 }
 
 /**
- * Turns a step of history into a line the user can recognise in the panel.
- *
  * Derived from the diff rather than supplied at each call site: a label written
  * by hand is one that eventually disagrees with what the step actually did.
  * Callers that know better — applying a named preset — can still override it.
  */
-export function describeChange(from: Edit, to: Edit): string {
+export function describeChange(from: Edit, to: Edit): StepLabel {
   const keys = changedAdjustments(from.adjustments, to.adjustments)
 
   if (keys.length === 0) return describeGeometry(from.geometry, to.geometry)
+  if (keys.length === 1) return { kind: 'adjustment', key: keys[0], value: to.adjustments[keys[0]] }
 
-  if (keys.length === 1) {
-    const spec = specFor(keys[0])
-    if (spec) return `${spec.label} ${formatValue(spec, to.adjustments[keys[0]])}`
-  }
-
-  return isDefault(to.adjustments) ? 'Ajustes restablecidos' : 'Varios ajustes'
+  return isDefault(to.adjustments) ? { kind: 'adjustmentsReset' } : { kind: 'adjustmentsMultiple' }
 }

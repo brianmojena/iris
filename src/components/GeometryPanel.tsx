@@ -9,6 +9,7 @@ import {
 } from '../types/geometry'
 import { applyAspect, resolveAspect } from '../lib/crop'
 import { Slider } from './Slider'
+import { fill, useDict } from '../i18n'
 import type { SliderSpec } from '../types/adjustments'
 import {
   IconCheck,
@@ -20,7 +21,6 @@ import {
 } from './icons'
 
 const ANGLE_SPEC: SliderSpec = {
-  label: 'Enderezar',
   min: -45,
   max: 45,
   step: 0.1,
@@ -37,11 +37,12 @@ export function GeometryPanel({ onDone }: { onDone: () => void }) {
   const endEdit = useEditor((s) => s.endEdit)
   const commit = useEditor((s) => s.commit)
   const resetGeometry = useEditor((s) => s.resetGeometry)
+  const t = useDict()
 
   if (!image) {
     return (
       <aside className="panel">
-        <p className="panel__empty">Abre una foto para recortarla.</p>
+        <p className="panel__empty">{t.panel.emptyCrop}</p>
       </aside>
     )
   }
@@ -72,7 +73,7 @@ export function GeometryPanel({ onDone }: { onDone: () => void }) {
     <aside className="panel">
       <div className="panel__scroll">
         <section className="group">
-          <h2 className="group__title">Proporción</h2>
+          <h2 className="group__title">{t.crop.aspect}</h2>
           <div className="chips">
             {ASPECT_PRESETS.map((preset) => (
               <button
@@ -81,22 +82,22 @@ export function GeometryPanel({ onDone }: { onDone: () => void }) {
                 aria-pressed={activePreset?.id === preset.id}
                 onClick={() => chooseAspect(preset.ratio)}
               >
-                {preset.label}
+                {preset.notation ?? t.crop[preset.id as 'free' | 'original']}
               </button>
             ))}
           </div>
         </section>
 
         <section className="group">
-          <h2 className="group__title">Orientación</h2>
+          <h2 className="group__title">{t.crop.orientation}</h2>
           <div className="panel__row">
             <button
               className="btn"
               onClick={() =>
                 commit({ geometry: rotateQuarter(geometry, sourceWidth, sourceHeight, -1) })
               }
-              title="Girar a la izquierda"
-              aria-label="Girar a la izquierda"
+              title={t.crop.rotateLeft}
+              aria-label={t.crop.rotateLeft}
             >
               <IconRotateLeft />
             </button>
@@ -105,24 +106,24 @@ export function GeometryPanel({ onDone }: { onDone: () => void }) {
               onClick={() =>
                 commit({ geometry: rotateQuarter(geometry, sourceWidth, sourceHeight, 1) })
               }
-              title="Girar a la derecha"
-              aria-label="Girar a la derecha"
+              title={t.crop.rotateRight}
+              aria-label={t.crop.rotateRight}
             >
               <IconRotateRight />
             </button>
             <button
               className="btn"
               onClick={() => commit({ geometry: flipGeometry(geometry, 'horizontal') })}
-              title="Voltear horizontalmente"
-              aria-label="Voltear horizontalmente"
+              title={t.crop.flipH}
+              aria-label={t.crop.flipH}
             >
               <IconFlipH />
             </button>
             <button
               className="btn"
               onClick={() => commit({ geometry: flipGeometry(geometry, 'vertical') })}
-              title="Voltear verticalmente"
-              aria-label="Voltear verticalmente"
+              title={t.crop.flipV}
+              aria-label={t.crop.flipV}
             >
               <IconFlipV />
             </button>
@@ -130,6 +131,7 @@ export function GeometryPanel({ onDone }: { onDone: () => void }) {
 
           <Slider
             spec={ANGLE_SPEC}
+            label={t.crop.straighten}
             value={geometry.angle}
             defaultValue={0}
             onStart={startEdit}
@@ -139,16 +141,16 @@ export function GeometryPanel({ onDone }: { onDone: () => void }) {
         </section>
 
         <p className="panel__note">
-          Resultado: {output.width} × {output.height} px
+          {fill(t.crop.result, { width: output.width, height: output.height })}
         </p>
       </div>
 
       <div className="panel__footer">
         <button className="btn" onClick={resetGeometry} disabled={untouched}>
-          <IconReset /> Restablecer
+          <IconReset /> {t.panel.reset}
         </button>
         <button className="btn btn--primary" onClick={onDone}>
-          <IconCheck /> Listo
+          <IconCheck /> {t.crop.done}
         </button>
       </div>
     </aside>

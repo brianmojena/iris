@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useEditor } from '../state/editorStore'
 import { isDefault } from '../types/adjustments'
+import { fill, useDict } from '../i18n'
 import { IconClose, IconPlus } from './icons'
 
 export function PresetStrip() {
@@ -11,6 +12,7 @@ export function PresetStrip() {
   const removePreset = useEditor((s) => s.removePreset)
   const loadPresets = useEditor((s) => s.loadPresets)
 
+  const t = useDict()
   const [naming, setNaming] = useState(false)
   const [name, setName] = useState('')
 
@@ -32,7 +34,7 @@ export function PresetStrip() {
 
   return (
     <section className="group">
-      <h2 className="group__title">Preajustes</h2>
+      <h2 className="group__title">{t.presets.title}</h2>
 
       <div className="chips">
         {presets.map((preset) => (
@@ -42,12 +44,14 @@ export function PresetStrip() {
               aria-pressed={active?.id === preset.id}
               onClick={() => applyPreset(preset)}
             >
-              {preset.name}
+              {preset.builtIn
+                ? t.presets.builtIn[preset.id as keyof typeof t.presets.builtIn]
+                : preset.name}
             </button>
             {!preset.builtIn && (
               <button
                 className="chip__remove"
-                aria-label={`Borrar el preajuste ${preset.name}`}
+                aria-label={fill(t.presets.remove, { name: preset.name ?? '' })}
                 onClick={() => void removePreset(preset.id)}
               >
                 <IconClose size={11} />
@@ -61,13 +65,9 @@ export function PresetStrip() {
             className="chip chip--ghost"
             onClick={() => setNaming(true)}
             disabled={isDefault(adjustments)}
-            title={
-              isDefault(adjustments)
-                ? 'Ajusta algo antes de guardarlo como preajuste'
-                : 'Guardar los ajustes actuales'
-            }
+            title={isDefault(adjustments) ? t.presets.saveDisabled : t.presets.saveHint}
           >
-            <IconPlus size={13} /> Guardar
+            <IconPlus size={13} /> {t.presets.save}
           </button>
         )}
       </div>
@@ -84,7 +84,7 @@ export function PresetStrip() {
             className="input"
             autoFocus
             value={name}
-            placeholder="Nombre del preajuste"
+            placeholder={t.presets.placeholder}
             maxLength={40}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
@@ -95,7 +95,7 @@ export function PresetStrip() {
             }}
           />
           <button className="btn btn--primary" type="submit" disabled={!name.trim()}>
-            Guardar
+            {t.presets.save}
           </button>
           <button
             className="btn"
@@ -105,7 +105,7 @@ export function PresetStrip() {
               setName('')
             }}
           >
-            Cancelar
+            {t.presets.cancel}
           </button>
         </form>
       )}

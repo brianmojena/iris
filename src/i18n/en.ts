@@ -1,0 +1,148 @@
+import type { Dictionary } from './es'
+
+export const en: Dictionary = {
+  code: 'en',
+  name: 'English',
+
+  app: {
+    open: 'Open',
+    export: 'Export',
+    undo: 'Undo',
+    redo: 'Redo',
+    undoHint: 'Undo (⌘Z)',
+    redoHint: 'Redo (⇧⌘Z)',
+    compare: 'Original',
+    compareHint: 'Hold to see the original (\\)',
+    compareLabel: 'Compare with the original',
+    opening: 'Opening…',
+    language: 'Language',
+    tools: 'Tools',
+  },
+
+  tabs: { adjust: 'Adjust', crop: 'Crop', history: 'History' },
+
+  dropzone: {
+    title: 'Drop a photo here',
+    or: 'or',
+    choose: 'choose a file',
+    privacy: 'Everything runs on your device. Nothing is uploaded anywhere.',
+    formats: 'JPEG · PNG · WebP · HEIC',
+    replace: 'Drop to open another photo',
+  },
+
+  groups: { light: 'Light', color: 'Color', detail: 'Detail', effects: 'Effects' },
+
+  adjustments: {
+    exposure: 'Exposure',
+    contrast: 'Contrast',
+    highlights: 'Highlights',
+    shadows: 'Shadows',
+    whites: 'Whites',
+    blacks: 'Blacks',
+    temperature: 'Temperature',
+    tint: 'Tint',
+    vibrance: 'Vibrance',
+    saturation: 'Saturation',
+    sharpness: 'Sharpening',
+    denoise: 'Noise reduction',
+    blur: 'Blur',
+    vignette: 'Vignette',
+    grain: 'Grain',
+  },
+
+  panel: {
+    reset: 'Reset',
+    emptyAdjust: 'Open a photo to start editing.',
+    emptyCrop: 'Open a photo to crop it.',
+    emptyHistory: 'Open a photo to see its history.',
+  },
+
+  presets: {
+    title: 'Presets',
+    save: 'Save',
+    placeholder: 'Preset name',
+    cancel: 'Cancel',
+    saveHint: 'Save the current adjustments',
+    saveDisabled: 'Adjust something before saving it as a preset',
+    remove: 'Delete the {name} preset',
+    builtIn: {
+      warm: 'Warm',
+      cool: 'Cool',
+      punch: 'Punchy',
+      matte: 'Matte',
+      bw: 'Black and white',
+      film: 'Film',
+    },
+  },
+
+  crop: {
+    aspect: 'Aspect ratio',
+    orientation: 'Orientation',
+    straighten: 'Straighten',
+    result: 'Result: {width} × {height} px',
+    done: 'Done',
+    rotateLeft: 'Rotate left',
+    rotateRight: 'Rotate right',
+    flipH: 'Flip horizontally',
+    flipV: 'Flip vertically',
+    free: 'Free',
+    original: 'Original',
+  },
+
+  history: {
+    backToOriginal: 'Back to original',
+    initial: 'Original',
+    adjustmentsReset: 'Adjustments reset',
+    adjustmentsMultiple: 'Several adjustments',
+    geometryReset: 'Framing reset',
+    crop: 'Crop',
+    rotateRight: 'Rotated right',
+    rotateLeft: 'Rotated left',
+    flipH: 'Flipped horizontally',
+    flipV: 'Flipped vertically',
+    straighten: 'Straightened {angle}°',
+    aspect: 'Aspect ratio {label}',
+    aspectFree: 'Aspect ratio free',
+    aspectCustom: 'Aspect ratio custom',
+    preset: 'Preset: {name}',
+  },
+
+  export: {
+    title: 'Export',
+    format: 'Format',
+    size: 'Size',
+    original: 'Original',
+    quality: 'Quality',
+    cancel: 'Cancel',
+    download: 'Download',
+    working: 'Exporting…',
+    dimensions: '{width} × {height} px',
+    label: 'Export image',
+  },
+
+  stage: {
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    fit: 'Fit to window',
+    original: 'Original',
+  },
+
+  notices: {
+    close: 'Dismiss',
+    sessionRestored: 'Your previous session was restored.',
+    downscaled: 'The image was reduced to {width}×{height} px so your GPU can process it.',
+    openFailed: 'The image could not be opened.',
+    exportFailed: 'The export failed.',
+    unsupportedFormat: 'Unsupported format: {type}',
+    unknownFormat: 'unknown',
+    heicFailed:
+      'The HEIC file could not be read. It may be damaged or use an unsupported variant.',
+    noWebgl: 'Your browser does not support WebGL2.',
+    contextLost: 'The graphics context was lost. Reloading the editor…',
+    contextUnrecoverable: 'WebGL could not be restored. Please reload the page.',
+    gpuMemory: 'GPU memory could not be allocated.',
+    textureFailed: 'The texture could not be created.',
+    shaderFailed: 'The shader could not be created.',
+    programFailed: 'The program could not be created.',
+  },
+}

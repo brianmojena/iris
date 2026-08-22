@@ -1,8 +1,10 @@
+import { dict } from '../../i18n'
+
 export class ShaderError extends Error {}
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type)
-  if (!shader) throw new ShaderError('No se pudo crear el shader')
+  if (!shader) throw new ShaderError(dict().notices.shaderFailed)
   gl.shaderSource(shader, source)
   gl.compileShader(shader)
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -29,7 +31,7 @@ export class Program {
     const vs = compile(gl, gl.VERTEX_SHADER, vertexSource)
     const fs = compile(gl, gl.FRAGMENT_SHADER, fragmentSource)
     const program = gl.createProgram()
-    if (!program) throw new ShaderError('No se pudo crear el programa')
+    if (!program) throw new ShaderError(dict().notices.programFailed)
 
     gl.attachShader(program, vs)
     gl.attachShader(program, fs)

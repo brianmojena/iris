@@ -8,6 +8,7 @@ import { FINISH_FRAG } from './shaders/finish.frag'
 import { needsEffectPasses, type Adjustments } from '../types/adjustments'
 import { outputSize, sourceTransform, type CropRect, type Geometry } from '../types/geometry'
 import { identity } from '../lib/matrix'
+import { dict } from '../i18n'
 
 /** Blur radius in source pixels when the slider is at 100. */
 const MAX_BLUR_RADIUS = 40
@@ -74,7 +75,7 @@ export class Renderer {
       powerPreference: 'high-performance',
     }) as WebGL2RenderingContext | null
 
-    if (!gl) throw new RendererError('Tu navegador no soporta WebGL2.')
+    if (!gl) throw new RendererError(dict().notices.noWebgl)
     this.gl = gl
 
     this.base = new Program(gl, QUAD_VERT, ADJUSTMENTS_FRAG)
@@ -84,7 +85,7 @@ export class Renderer {
 
     const vao = gl.createVertexArray()
     const buffer = gl.createBuffer()
-    if (!vao || !buffer) throw new RendererError('No se pudo reservar memoria en la GPU.')
+    if (!vao || !buffer) throw new RendererError(dict().notices.gpuMemory)
 
     gl.bindVertexArray(vao)
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
@@ -118,7 +119,7 @@ export class Renderer {
     this.disposeTexture()
 
     const texture = gl.createTexture()
-    if (!texture) throw new RendererError('No se pudo crear la textura.')
+    if (!texture) throw new RendererError(dict().notices.textureFailed)
 
     gl.bindTexture(gl.TEXTURE_2D, texture)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)

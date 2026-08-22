@@ -3,7 +3,8 @@ import { DEFAULT_ADJUSTMENTS, isDefault, type AdjustmentKey } from '../types/adj
 import { defaultGeometry, isDefaultGeometry, type Geometry } from '../types/geometry'
 import { sameEdit, type Edit } from '../types/edit'
 import { BUILT_IN_PRESETS, type Preset } from '../types/presets'
-import { INITIAL_LABEL, describeChange } from '../lib/describe'
+import { INITIAL_LABEL, describeChange, type StepLabel } from '../lib/describe'
+import { dict, fill } from '../i18n'
 import { loadImageFile, decodeBlob, type LoadedImage } from '../lib/decode'
 import * as storage from '../lib/storage'
 import type { ExportOptions } from '../lib/export'
@@ -21,7 +22,8 @@ export interface Notice {
 
 export interface HistoryEntry {
   edit: Edit
-  label: string
+  /** Structured, not worded: see StepLabel. */
+  label: StepLabel
 }
 
 interface EditorState {
@@ -53,7 +55,7 @@ interface EditorState {
   setGeometry: (patch: Partial<Geometry>) => void
   endEdit: () => void
   /** Applies a change and records it as a single history entry immediately. */
-  commit: (patch: Partial<Edit>, label?: string) => void
+  commit: (patch: Partial<Edit>, label?: StepLabel) => void
   resetAdjustments: () => void
   resetGeometry: () => void
 
@@ -136,7 +138,7 @@ export const useEditor = create<EditorState>((set, get) => ({
           history: saved.history,
           index,
           snapshot: null,
-          notice: { kind: 'info', message: 'Recuperada la sesión anterior.' },
+          notice: { kind: 'info', message: dict().notices.sessionRestored },
         })
       } catch {
         // A session we cannot decode is worse than no session.
@@ -168,7 +170,10 @@ export const useEditor = create<EditorState>((set, get) => ({
         notice: image.downscaled
           ? {
               kind: 'info',
-              message: `La imagen se redujo a ${image.bitmap.width}×${image.bitmap.height} px para poder procesarla en tu GPU.`,
+              message: fill(dict().notices.downscaled, {
+                width: image.bitmap.width,
+                height: image.bitmap.height,
+              }),
             }
           : null,
       })
@@ -177,7 +182,7 @@ export const useEditor = create<EditorState>((set, get) => ({
         status: previous ? 'ready' : 'empty',
         notice: {
           kind: 'error',
-          message: error instanceof Error ? error.message : 'No se pudo abrir la imagen.',
+          message: error instanceof Error ? error.message : dict().notices.openFailed,
         },
       })
     }
@@ -216,7 +221,7 @@ export const useEditor = create<EditorState>((set, get) => ({
 
   resetAdjustments() {
     if (isDefault(get().edit.adjustments)) return
-    get().commit({ adjustments: { ...DEFAULT_ADJUSTMENTS } }, 'Ajustes restablecidos')
+    get().commit({ adjustments: { ...DEFAULT_ADJUSTMENTS } }, { kind: 'adjustmentsReset' })
   },
 
   resetGeometry() {
@@ -224,7 +229,7 @@ export const useEditor = create<EditorState>((set, get) => ({
     if (!image) return
     const { width, height } = image.bitmap
     if (isDefaultGeometry(edit.geometry, width, height)) return
-    get().commit({ geometry: defaultGeometry(width, height) }, 'Encuadre restablecido')
+    get().commit({ geometry: defaultGeometry(width, height) }, { kind: 'geometryReset' })
   },
 
   undo() {
@@ -247,13 +252,22 @@ export const useEditor = create<EditorState>((set, get) => ({
     set({
       presets: [
         ...BUILT_IN_PRESETS,
-        ...stored.map((p) => ({ id: p.id, name: p.name, adjustments: p.adjustments, builtIn: false })),
+        ...stored.map((p) => ({
+          id: p.id,
+          name: p.name,
+          adjustments: p.adjustments,
+          builtIn: false,
+        })),
       ],
     })
   },
 
   applyPreset(preset) {
-    get().commit({ adjustments: { ...preset.adjustments } }, `Preajuste: ${preset.name}`)
+    get().commit({ adjustments: { ...preset.adjustments } }, {
+      kind: 'preset',
+      presetId: preset.id,
+      name: preset.name,
+    })
   },
 
   async createPreset(name) {
@@ -297,7 +311,7 @@ function record(
   set: (partial: Partial<EditorState>) => void,
   get: () => EditorState,
   edit: Edit,
-  label: string,
+  label: StepLabel,
 ): void {
   const { history, index } = get()
   const trimmed = [...history.slice(0, index + 1), { edit, label }].slice(-HISTORY_LIMIT)

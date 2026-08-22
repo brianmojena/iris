@@ -1,3 +1,5 @@
+import { dict } from '../../i18n'
+
 /**
  * An off-screen surface a pass can draw into and the next pass can read from.
  *
@@ -17,7 +19,7 @@ export class RenderTarget {
   constructor(private readonly gl: WebGL2RenderingContext) {
     const texture = gl.createTexture()
     const framebuffer = gl.createFramebuffer()
-    if (!texture || !framebuffer) throw new Error('No se pudo reservar memoria en la GPU.')
+    if (!texture || !framebuffer) throw new Error(dict().notices.gpuMemory)
 
     this.texture = texture
     this.framebuffer = framebuffer

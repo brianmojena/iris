@@ -3,6 +3,7 @@ import { Renderer } from '../engine/Renderer'
 import { useEditor } from '../state/editorStore'
 import { straightenedBounds, turnedSize } from '../types/geometry'
 import { CropOverlay } from './CropOverlay'
+import { dict, useDict } from '../i18n'
 import { IconFit, IconMinus, IconPlus } from './icons'
 
 /** Zoom is expressed as a multiple of "fits the viewport". */
@@ -48,6 +49,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
   const [view, setView] = useState<View>(FIT)
   const [panning, setPanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const t = useDict()
 
   // Live pointers, so two fingers can be told apart from one.
   const pointers = useRef(new Map<number, React.PointerEvent>())
@@ -153,7 +155,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
       rendererRef.current = new Renderer(canvas)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo iniciar WebGL.')
+      setError(e instanceof Error ? e.message : dict().notices.noWebgl)
     }
     return () => {
       rendererRef.current?.dispose()
@@ -222,7 +224,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
     if (!canvas) return
     const onLost = (event: Event) => {
       event.preventDefault()
-      setError('Se perdió el contexto gráfico. Recargando el editor…')
+      setError(dict().notices.contextLost)
     }
     const onRestored = () => {
       try {
@@ -231,7 +233,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
         if (image) rendererRef.current.setImage(image.bitmap)
         setError(null)
       } catch {
-        setError('No se pudo restaurar WebGL. Recarga la página.')
+        setError(dict().notices.contextUnrecoverable)
       }
     }
     canvas.addEventListener('webglcontextlost', onLost)
@@ -387,7 +389,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
         />
       )}
 
-      {showOriginal && <div className="stage__badge">Original</div>}
+      {showOriginal && <div className="stage__badge">{t.stage.original}</div>}
 
       {image && !cropMode && (
         <div className="stage__hud">
@@ -395,7 +397,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
             className="btn btn--icon"
             onClick={() => zoomAt(1 / 1.3)}
             disabled={view.zoom <= MIN_ZOOM}
-            aria-label="Alejar"
+            aria-label={t.stage.zoomOut}
           >
             <IconMinus />
           </button>
@@ -404,7 +406,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
             className="btn btn--icon"
             onClick={() => zoomAt(1.3)}
             disabled={view.zoom >= MAX_ZOOM}
-            aria-label="Acercar"
+            aria-label={t.stage.zoomIn}
           >
             <IconPlus />
           </button>
@@ -412,7 +414,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
             className="btn btn--icon"
             onClick={() => setView(FIT)}
             disabled={view.zoom === 1}
-            aria-label="Ajustar a la ventana"
+            aria-label={t.stage.fit}
           >
             <IconFit />
           </button>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useEditor } from '../state/editorStore'
 import { outputSize } from '../types/geometry'
+import { fill, useDict } from '../i18n'
 import {
   EXPORT_FORMATS,
   downloadBlob,
@@ -11,8 +12,9 @@ import {
   type ExportFormat,
 } from '../lib/export'
 
-const SIZE_PRESETS: { label: string; maxEdge: number | null }[] = [
-  { label: 'Original', maxEdge: null },
+/** Only the first needs a word; the rest are pixel counts in any language. */
+const SIZE_PRESETS: { label: string | null; maxEdge: number | null }[] = [
+  { label: null, maxEdge: null },
   { label: '4096 px', maxEdge: 4096 },
   { label: '2048 px', maxEdge: 2048 },
   { label: '1080 px', maxEdge: 1080 },
@@ -27,6 +29,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const setExporting = useEditor((s) => s.setExporting)
   const notify = useEditor((s) => s.notify)
   const [size, setSize] = useState<number | null>(null)
+  const t = useDict()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -73,7 +76,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     } catch (error) {
       notify({
         kind: 'error',
-        message: error instanceof Error ? error.message : 'La exportación falló.',
+        message: error instanceof Error ? error.message : t.notices.exportFailed,
       })
     } finally {
       setExporting(false)
@@ -86,14 +89,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         className="dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Exportar imagen"
+        aria-label={t.export.label}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="dialog__head">Exportar</div>
+        <div className="dialog__head">{t.export.title}</div>
 
         <div className="dialog__body">
           <div className="field">
-            <span className="field__label">Formato</span>
+            <span className="field__label">{t.export.format}</span>
             <div className="segmented">
               {EXPORT_FORMATS.map((format) => (
                 <button
@@ -108,15 +111,15 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="field">
-            <span className="field__label">Tamaño</span>
+            <span className="field__label">{t.export.size}</span>
             <div className="segmented">
               {SIZE_PRESETS.map((preset) => (
                 <button
-                  key={preset.label}
+                  key={preset.maxEdge ?? 'original'}
                   aria-pressed={options.maxEdge === preset.maxEdge}
                   onClick={() => setExportOptions({ maxEdge: preset.maxEdge })}
                 >
-                  {preset.label}
+                  {preset.label ?? t.export.original}
                 </button>
               ))}
             </div>
@@ -124,7 +127,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
           {lossy && (
             <div className="field">
-              <span className="field__label">Calidad · {Math.round(options.quality * 100)}</span>
+              <span className="field__label">
+                {t.export.quality} · {Math.round(options.quality * 100)}
+              </span>
               <input
                 className="range"
                 type="range"
@@ -138,17 +143,17 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           )}
 
           <p className="dialog__meta">
-            {target.width} × {target.height} px
+            {fill(t.export.dimensions, { width: target.width, height: target.height })}
             {size !== null && ` · ${formatBytes(size)}`}
           </p>
         </div>
 
         <div className="dialog__foot">
           <button className="btn" onClick={onClose}>
-            Cancelar
+            {t.export.cancel}
           </button>
           <button className="btn btn--primary" onClick={handleExport} disabled={isExporting}>
-            {isExporting ? 'Exportando…' : 'Descargar'}
+            {isExporting ? t.export.working : t.export.download}
           </button>
         </div>
       </div>

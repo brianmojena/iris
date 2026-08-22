@@ -8,6 +8,7 @@ import { ExportDialog } from './components/ExportDialog'
 import { TopBar } from './components/TopBar'
 import { IconClock, IconClose, IconCrop, IconSliders } from './components/icons'
 import { useEditor } from './state/editorStore'
+import { useDict } from './i18n'
 
 export default function App() {
   const image = useEditor((s) => s.image)
@@ -21,6 +22,7 @@ export default function App() {
   const [exporting, setExporting] = useState(false)
   const [comparing, setComparing] = useState(false)
   const [tab, setTab] = useState<'adjust' | 'crop' | 'history'>('adjust')
+  const t = useDict()
   // Drag events bubble through every child, so track enter/leave depth.
   const dragDepth = useRef(0)
   const [draggingOver, setDraggingOver] = useState(false)
@@ -122,27 +124,27 @@ export default function App() {
         {image ? <CanvasView showOriginal={comparing} cropMode={tab === 'crop'} /> : <Dropzone />}
 
         <div className="panel-host">
-          <nav className="tabs" aria-label="Herramientas">
+          <nav className="tabs" aria-label={t.app.tools}>
             <button
               className="tabs__tab"
               aria-pressed={tab === 'adjust'}
               onClick={() => setTab('adjust')}
             >
-              <IconSliders /> Ajustes
+              <IconSliders /> {t.tabs.adjust}
             </button>
             <button
               className="tabs__tab"
               aria-pressed={tab === 'crop'}
               onClick={() => setTab('crop')}
             >
-              <IconCrop /> Recorte
+              <IconCrop /> {t.tabs.crop}
             </button>
             <button
               className="tabs__tab"
               aria-pressed={tab === 'history'}
               onClick={() => setTab('history')}
             >
-              <IconClock /> Historial
+              <IconClock /> {t.tabs.history}
             </button>
           </nav>
 
@@ -155,7 +157,7 @@ export default function App() {
       {image && draggingOver && (
         <div className="backdrop" style={{ pointerEvents: 'none' }}>
           <div className="dialog" style={{ padding: '28px 32px', textAlign: 'center' }}>
-            Suelta para abrir otra foto
+            {t.dropzone.replace}
           </div>
         </div>
       )}
@@ -163,7 +165,11 @@ export default function App() {
       {notice && (
         <div className={`notice${notice.kind === 'error' ? ' notice--error' : ''}`} role="status">
           <span>{notice.message}</span>
-          <button className="notice__close" onClick={() => notify(null)} aria-label="Cerrar aviso">
+          <button
+            className="notice__close"
+            onClick={() => notify(null)}
+            aria-label={t.notices.close}
+          >
             <IconClose />
           </button>
         </div>

@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { ACCEPTED_FILE_TYPES } from '../lib/decode'
 import { useEditor } from '../state/editorStore'
+import { LOCALES, useDict, useLocaleStore } from '../i18n'
 import { IconCompare, IconDownload, IconRedo, IconUndo } from './icons'
 
 interface TopBarProps {
@@ -18,6 +19,9 @@ export function TopBar({ onExport, onCompareChange, comparing }: TopBarProps) {
   const canUndo = useEditor((s) => s.index > 0)
   const canRedo = useEditor((s) => s.index < s.history.length - 1)
   const inputRef = useRef<HTMLInputElement>(null)
+  const t = useDict()
+  const locale = useLocaleStore((s) => s.locale)
+  const setLocale = useLocaleStore((s) => s.setLocale)
 
   return (
     <header className="topbar">
@@ -43,8 +47,8 @@ export function TopBar({ onExport, onCompareChange, comparing }: TopBarProps) {
               className="btn btn--icon"
               onClick={undo}
               disabled={!canUndo}
-              title="Deshacer (⌘Z)"
-              aria-label="Deshacer"
+              title={t.app.undoHint}
+              aria-label={t.app.undo}
             >
               <IconUndo />
             </button>
@@ -52,8 +56,8 @@ export function TopBar({ onExport, onCompareChange, comparing }: TopBarProps) {
               className="btn btn--icon"
               onClick={redo}
               disabled={!canRedo}
-              title="Rehacer (⇧⌘Z)"
-              aria-label="Rehacer"
+              title={t.app.redoHint}
+              aria-label={t.app.redo}
             >
               <IconRedo />
             </button>
@@ -61,29 +65,42 @@ export function TopBar({ onExport, onCompareChange, comparing }: TopBarProps) {
 
           <button
             className={`btn${comparing ? ' btn--active' : ''}`}
-            title="Mantén pulsado para ver el original (\\)"
-            aria-label="Comparar con el original"
+            title={t.app.compareHint}
+            aria-label={t.app.compareLabel}
             onPointerDown={() => onCompareChange(true)}
             onPointerUp={() => onCompareChange(false)}
             onPointerLeave={() => onCompareChange(false)}
             onPointerCancel={() => onCompareChange(false)}
           >
             <IconCompare />
-            <span className="btn--wide-only">Original</span>
+            <span className="btn--wide-only">{t.app.compare}</span>
           </button>
         </>
       )}
 
       <button className="btn" onClick={() => inputRef.current?.click()}>
-        Abrir
+        {t.app.open}
       </button>
 
       {image && (
         <button className="btn btn--primary" onClick={onExport}>
           <IconDownload />
-          <span className="btn--wide-only">Exportar</span>
+          <span className="btn--wide-only">{t.app.export}</span>
         </button>
       )}
+
+      <select
+        className="language"
+        aria-label={t.app.language}
+        value={locale}
+        onChange={(event) => setLocale(event.target.value as (typeof LOCALES)[number])}
+      >
+        {LOCALES.map((code) => (
+          <option key={code} value={code}>
+            {code.toUpperCase()}
+          </option>
+        ))}
+      </select>
 
       <input
         ref={inputRef}

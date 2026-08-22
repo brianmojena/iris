@@ -3,6 +3,8 @@ import { formatValue, type SliderSpec } from '../types/adjustments'
 
 interface SliderProps {
   spec: SliderSpec
+  /** Comes from the dictionary, so the control itself stays language-agnostic. */
+  label: string
   value: number
   defaultValue: number
   onStart: () => void
@@ -25,7 +27,7 @@ function snap(value: number, step: number): number {
  * fill can grow outward from the neutral origin and so a drag maps to a single
  * undo step regardless of how many values it passes through.
  */
-export function Slider({ spec, value, defaultValue, onStart, onChange, onEnd }: SliderProps) {
+export function Slider({ spec, label, value, defaultValue, onStart, onChange, onEnd }: SliderProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   // The ref is what the handlers branch on; the state only drives styling. React
   // batches updates, so a tap fast enough to put pointerdown and pointerup in the
@@ -114,7 +116,7 @@ export function Slider({ spec, value, defaultValue, onStart, onChange, onEnd }: 
     >
       <div className="slider__header">
         <span className="slider__label" onDoubleClick={reset}>
-          {spec.label}
+          {label}
         </span>
         <span className="slider__value">{formatValue(spec, value)}</span>
       </div>
@@ -123,7 +125,7 @@ export function Slider({ spec, value, defaultValue, onStart, onChange, onEnd }: 
         className="slider__track"
         role="slider"
         tabIndex={0}
-        aria-label={spec.label}
+        aria-label={label}
         aria-valuemin={spec.min}
         aria-valuemax={spec.max}
         aria-valuenow={value}

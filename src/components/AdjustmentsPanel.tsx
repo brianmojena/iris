@@ -1,4 +1,5 @@
 import { useEditor } from '../state/editorStore'
+import { useDict } from '../i18n'
 import {
   ADJUSTMENT_GROUPS,
   ADJUSTMENT_SPECS,
@@ -16,11 +17,12 @@ export function AdjustmentsPanel({ onExport }: { onExport: () => void }) {
   const setAdjustment = useEditor((s) => s.setAdjustment)
   const endEdit = useEditor((s) => s.endEdit)
   const resetAdjustments = useEditor((s) => s.resetAdjustments)
+  const t = useDict()
 
   if (!image) {
     return (
       <aside className="panel">
-        <p className="panel__empty">Abre una foto para empezar a editar.</p>
+        <p className="panel__empty">{t.panel.emptyAdjust}</p>
       </aside>
     )
   }
@@ -33,12 +35,13 @@ export function AdjustmentsPanel({ onExport }: { onExport: () => void }) {
         <PresetStrip />
 
         {ADJUSTMENT_GROUPS.map((group) => (
-          <section className="group" key={group.id}>
-            <h2 className="group__title">{group.label}</h2>
-            {ADJUSTMENT_SPECS.filter((spec) => spec.group === group.id).map((spec) => (
+          <section className="group" key={group}>
+            <h2 className="group__title">{t.groups[group]}</h2>
+            {ADJUSTMENT_SPECS.filter((spec) => spec.group === group).map((spec) => (
               <Slider
                 key={spec.key}
                 spec={spec}
+                label={t.adjustments[spec.key]}
                 value={adjustments[spec.key]}
                 defaultValue={DEFAULT_ADJUSTMENTS[spec.key]}
                 onStart={startEdit}
@@ -52,10 +55,10 @@ export function AdjustmentsPanel({ onExport }: { onExport: () => void }) {
 
       <div className="panel__footer">
         <button className="btn" onClick={resetAdjustments} disabled={untouched}>
-          <IconReset /> Restablecer
+          <IconReset /> {t.panel.reset}
         </button>
         <button className="btn btn--primary" onClick={onExport}>
-          <IconDownload /> Exportar
+          <IconDownload /> {t.app.export}
         </button>
       </div>
     </aside>

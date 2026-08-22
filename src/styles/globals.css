@@ -111,6 +111,27 @@ button:disabled {
   flex: 1;
 }
 
+.language {
+  height: 34px;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  appearance: none;
+  text-align: center;
+}
+
+.language:hover {
+  background: var(--canvas-bg);
+  color: var(--text);
+}
+
 .topbar__loading {
   display: inline-flex;
   align-items: center;

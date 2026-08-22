@@ -30,19 +30,24 @@ export interface Geometry {
 
 export interface AspectPreset {
   id: string
-  label: string
+  /**
+   * Ratio notation reads the same in every language, so it stays here. The two
+   * presets that need words — free and original — carry none and are looked up
+   * in the dictionary by id.
+   */
+  notation?: string
   /** null is free, 'original' follows the source image. */
   ratio: number | null | 'original'
 }
 
 export const ASPECT_PRESETS: AspectPreset[] = [
-  { id: 'free', label: 'Libre', ratio: null },
-  { id: 'original', label: 'Original', ratio: 'original' },
-  { id: 'square', label: '1:1', ratio: 1 },
-  { id: 'portrait45', label: '4:5', ratio: 4 / 5 },
-  { id: 'photo32', label: '3:2', ratio: 3 / 2 },
-  { id: 'wide169', label: '16:9', ratio: 16 / 9 },
-  { id: 'story', label: '9:16', ratio: 9 / 16 },
+  { id: 'free', ratio: null },
+  { id: 'original', ratio: 'original' },
+  { id: 'square', notation: '1:1', ratio: 1 },
+  { id: 'portrait45', notation: '4:5', ratio: 4 / 5 },
+  { id: 'photo32', notation: '3:2', ratio: 3 / 2 },
+  { id: 'wide169', notation: '16:9', ratio: 16 / 9 },
+  { id: 'story', notation: '9:16', ratio: 9 / 16 },
 ]
 
 /** Dimensions of the image after flips and quarter turns, before straightening. */
