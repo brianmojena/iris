@@ -14,6 +14,15 @@ export interface Adjustments {
   tint: number // -100 (green) .. 100 (magenta)
   vibrance: number // -100..100
   saturation: number // -100..100
+
+  // Spatial work. Unlike everything above, these need neighbouring pixels, so
+  // they run as separate passes over the already-framed image.
+  sharpness: number // 0..100
+  denoise: number // 0..100
+  blur: number // 0..100
+
+  vignette: number // -100 (bright corners) .. 100 (dark corners)
+  grain: number // 0..100
 }
 
 export const DEFAULT_ADJUSTMENTS: Adjustments = {
@@ -27,6 +36,11 @@ export const DEFAULT_ADJUSTMENTS: Adjustments = {
   tint: 0,
   vibrance: 0,
   saturation: 0,
+  sharpness: 0,
+  denoise: 0,
+  blur: 0,
+  vignette: 0,
+  grain: 0,
 }
 
 export type AdjustmentKey = keyof Adjustments
@@ -43,9 +57,11 @@ export interface SliderSpec {
   suffix?: string
 }
 
+export type AdjustmentGroup = 'light' | 'color' | 'detail' | 'effects'
+
 export interface AdjustmentSpec extends SliderSpec {
   key: AdjustmentKey
-  group: 'light' | 'color'
+  group: AdjustmentGroup
 }
 
 export const ADJUSTMENT_SPECS: AdjustmentSpec[] = [
@@ -68,12 +84,32 @@ export const ADJUSTMENT_SPECS: AdjustmentSpec[] = [
   { key: 'tint', label: 'Matiz', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
   { key: 'vibrance', label: 'Intensidad', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
   { key: 'saturation', label: 'Saturación', min: -100, max: 100, step: 1, origin: 0, group: 'color' },
+  { key: 'sharpness', label: 'Nitidez', min: 0, max: 100, step: 1, origin: 0, group: 'detail' },
+  {
+    key: 'denoise',
+    label: 'Reducción de ruido',
+    min: 0,
+    max: 100,
+    step: 1,
+    origin: 0,
+    group: 'detail',
+  },
+  { key: 'blur', label: 'Desenfoque', min: 0, max: 100, step: 1, origin: 0, group: 'detail' },
+  { key: 'vignette', label: 'Viñeta', min: -100, max: 100, step: 1, origin: 0, group: 'effects' },
+  { key: 'grain', label: 'Grano', min: 0, max: 100, step: 1, origin: 0, group: 'effects' },
 ]
 
-export const ADJUSTMENT_GROUPS: { id: AdjustmentSpec['group']; label: string }[] = [
+export const ADJUSTMENT_GROUPS: { id: AdjustmentGroup; label: string }[] = [
   { id: 'light', label: 'Luz' },
   { id: 'color', label: 'Color' },
+  { id: 'detail', label: 'Detalle' },
+  { id: 'effects', label: 'Efectos' },
 ]
+
+/** True when no pass beyond the base colour pass has anything to do. */
+export function needsEffectPasses(a: Adjustments): boolean {
+  return a.sharpness > 0 || a.denoise > 0 || a.blur > 0 || a.vignette !== 0 || a.grain > 0
+}
 
 export function isDefault(a: Adjustments): boolean {
   return (Object.keys(DEFAULT_ADJUSTMENTS) as AdjustmentKey[]).every(

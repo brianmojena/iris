@@ -33,6 +33,8 @@ uniform float u_saturation;  // -1..1
 
 uniform float u_bypass;      // 1.0 renders the untouched original
 uniform vec2  u_resolution;  // for output dithering
+/** 1.0 when this pass writes straight to the screen and owns the dithering. */
+uniform float u_dither;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
@@ -171,7 +173,7 @@ void main() {
   c = mix(vec3(grey), c, 1.0 + u_saturation);
   c = clamp(c, 0.0, 1.0);
 
-  c += dither(gl_FragCoord.xy / max(u_resolution, vec2(1.0))) / 255.0;
+  c += u_dither * dither(gl_FragCoord.xy / max(u_resolution, vec2(1.0))) / 255.0;
 
   fragColor = vec4(clamp(c, 0.0, 1.0), src.a * coverage);
 }

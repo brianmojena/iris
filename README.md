@@ -10,13 +10,12 @@ npm run dev
 
 ## Estado
 
-**Fases 1 y 2 completas.** Carga de imagen, motor de render WebGL2, los diez
-ajustes básicos de luz y color, zoom y desplazamiento, comparación con el
-original, historial, exportación, y el editor de recorte: proporciones fijas,
-enderezado, giros de 90° y volteos.
+**MVP completo.** Carga de imagen, motor de render WebGL2, quince controles
+repartidos en luz, color, detalle y efectos, editor de recorte con proporciones
+fijas y enderezado, zoom y desplazamiento, comparación con el original,
+historial y exportación.
 
-Pendiente: detalle y efectos (nitidez, ruido, grano, viñeta), panel de historial
-visible y persistencia de proyectos en IndexedDB.
+Pendiente: panel de historial visible y persistencia de proyectos en IndexedDB.
 
 ## Cómo está construido
 
@@ -29,9 +28,10 @@ adelante— los ajustes preestablecidos y el copiar/pegar entre fotos.
 ```
 src/
   engine/
-    Renderer.ts              contexto GL, textura de origen, un draw call
+    Renderer.ts              contexto GL, textura de origen, cadena de pasadas
     gl/program.ts            compilado, enlazado y caché de uniforms
-    shaders/                 el pipeline de color y encuadre, en GLSL
+    gl/target.ts             superficies fuera de pantalla entre pasadas
+    shaders/                 el pipeline, en GLSL
   lib/
     decode.ts                apertura de archivos, HEIC, orientación EXIF
     export.ts                render a tamaño completo y descarga
@@ -86,6 +86,33 @@ Dos decisiones que no son evidentes:
   independencia de cuántos cuartos de giro haya acumulados. Además invierte el
   ángulo de enderezado, para que se refleje la composición entera y no solo su
   contenido.
+
+### Las pasadas
+
+El color se resuelve en una sola pasada. Nitidez, reducción de ruido y
+desenfoque no pueden: necesitan píxeles vecinos, así que cuando alguno entra en
+juego la cadena crece —color a una textura fuera de pantalla, luego las pasadas
+espaciales, luego una final a la pantalla—. Las pasadas que no tienen nada que
+hacer se saltan, de modo que una foto sin efectos sigue costando un solo
+`drawArrays`. Con la cadena completa a 3 MP el arrastre de un control se mantiene
+en 60 fps.
+
+Las superficies intermedias son de 8 bits a propósito. Con media coma flotante se
+arrastraría algo más de precisión, pero una exportación de 24 megapíxeles necesita
+tres vivas a la vez, y a ocho bytes por píxel eso pasa de medio gigabyte de
+memoria de GPU para un archivo que el usuario espera simplemente guardar.
+
+Tres detalles que costaron encontrar:
+
+- Dibujar a un framebuffer **invierte Y** respecto a dibujar al canvas. El vertex
+  shader voltea la coordenada para compensar que los bitmaps van de arriba abajo;
+  con dos pasadas ese volteo se aplicaba una vez de más. Ahora es un uniform:
+  solo voltea la pasada que lee el bitmap original.
+- El hash de ruido habitual, `sin`-`dot`-`fract`, se distribuye pésimamente con
+  entradas enteras —y los índices de celda del grano lo son—. No añadía textura:
+  desplazaba el brillo medio de un cielo liso en cincuenta niveles.
+- El grano se atenúa con la reducción de escala del preview. Sin eso, la vista
+  previa mostraba mucho más grano del que acababa teniendo el archivo.
 
 ## Formatos
 
