@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Renderer } from '../engine/Renderer'
+import { Renderer, type ScopeSample } from '../engine/Renderer'
 import { useEditor } from '../state/editorStore'
 import { straightenedBounds, turnedSize } from '../types/geometry'
 import { CropOverlay } from './CropOverlay'
+import { Scopes } from './Scopes'
 import { dict, useDict } from '../i18n'
 import { IconFit, IconMinus, IconPlus } from './icons'
 
@@ -33,12 +34,19 @@ interface CanvasViewProps {
   showOriginal: boolean
   /** While cropping, the whole straightened image is shown and zoom is locked. */
   cropMode: boolean
+  showScopes: boolean
+  onCloseScopes: () => void
 }
 
-export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
+export function CanvasView({
+  showOriginal,
+  cropMode,
+  showScopes,
+  onCloseScopes,
+}: CanvasViewProps) {
   const image = useEditor((s) => s.image)
-  const adjustments = useEditor((s) => s.edit.adjustments)
-  const geometry = useEditor((s) => s.edit.geometry)
+  const edit = useEditor((s) => s.edit)
+  const geometry = edit.geometry
 
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -49,6 +57,7 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
   const [view, setView] = useState<View>(FIT)
   const [panning, setPanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sample, setSample] = useState<ScopeSample | null>(null)
   const t = useDict()
 
   // Live pointers, so two fingers can be told apart from one.
@@ -194,25 +203,29 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
         height = Math.round(height * scale)
       }
 
-      renderer.render(adjustments, Math.max(width, 1), Math.max(height, 1), {
+      const options = {
         bypass: showOriginal,
-        geometry,
         cropOverride: cropMode
           ? { cx: 0, cy: 0, width: bounds.width, height: bounds.height }
           : undefined,
-      })
+      }
+      renderer.render(edit, Math.max(width, 1), Math.max(height, 1), options)
+
+      // Measured in the same frame it was drawn, off a thumbnail of its own, so
+      // the scopes never make the preview wait on a full-size pixel readback.
+      if (showScopes) setSample(renderer.readScope(edit, options))
     })
 
     return () => cancelAnimationFrame(frameRef.current)
   }, [
-    adjustments,
-    geometry,
+    edit,
     image,
     displayWidth,
     displayHeight,
     contentWidth,
     showOriginal,
     cropMode,
+    showScopes,
     bounds.width,
     bounds.height,
   ])
@@ -390,6 +403,8 @@ export function CanvasView({ showOriginal, cropMode }: CanvasViewProps) {
       )}
 
       {showOriginal && <div className="stage__badge">{t.stage.original}</div>}
+
+      {image && showScopes && <Scopes sample={sample} onClose={onCloseScopes} />}
 
       {image && !cropMode && (
         <div className="stage__hud">

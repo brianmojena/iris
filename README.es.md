@@ -14,19 +14,20 @@ npm run dev
 
 ## Estado
 
-**MVP completo, más historial, persistencia e interfaz bilingüe.** Quince
-controles repartidos en luz, color, detalle y efectos; editor de recorte con
-proporciones fijas y enderezado; panel de historial navegable; preajustes propios
-y de fábrica; la sesión se recupera sola al volver; y la interfaz habla español e
-inglés.
+**MVP completo, más historial, persistencia, interfaz bilingüe y etalonaje.**
+Quince controles repartidos en luz, color, detalle y efectos; una pestaña de
+color con cuatro ruedas y cuatro curvas; histograma, forma de onda, parade y
+vectorscopio flotando sobre la foto; editor de recorte con proporciones fijas y
+enderezado; panel de historial navegable; preajustes propios y de fábrica; la
+sesión se recupera sola al volver; y la interfaz habla español e inglés.
 
 El MVP acordado está terminado. Lo que queda son mejoras, no huecos.
 
 ## Cómo está construido
 
 Todo el procesamiento ocurre en la GPU a través de un único paso de fragment
-shader. El estado de la edición es un objeto plano y serializable
-(`src/types/adjustments.ts`); ninguna herramienta toca píxeles, solo escribe en
+shader. El estado de la edición es un objeto serializable
+(`src/types/edit.ts`); ninguna herramienta toca píxeles, solo escribe en
 ese objeto. De ahí salen gratis la edición no destructiva, el historial y —más
 adelante— los ajustes preestablecidos y el copiar/pegar entre fotos.
 
@@ -45,7 +46,10 @@ src/
     export.ts                render a tamaño completo y descarga
     matrix.ts                afín 3×3, en el orden que espera WebGL
     crop.ts                  arrastre de tiradores y proporciones
+    curve.ts                 spline monótona y la tabla de curvas
+    scopes.ts                histograma, onda, parade, vectorscopio
   types/geometry.ts          encuadre: giros, volteos, enderezado, recorte
+  types/grade.ts             ruedas y curvas, y la matemática de las ruedas
   state/editorStore.ts       estado, historial, deshacer/rehacer
   components/                interfaz
 ```
@@ -61,7 +65,9 @@ El orden imita al de un procesador raw:
 1. Se decodifica a luz lineal.
 2. Exposición y balance de blancos, que solo tienen sentido físico en lineal.
 3. Se vuelve a gamma de pantalla.
-4. Rango tonal, contraste y saturación, que son perceptuales.
+4. Rango tonal y contraste, que son perceptuales.
+5. El grade: primero las ruedas de color, después las curvas.
+6. Intensidad y saturación, que rematan lo que el grade haya dejado.
 
 Las tres decisiones que costaron encontrar, documentadas en el shader:
 
@@ -73,6 +79,78 @@ Las tres decisiones que costaron encontrar, documentadas en el shader:
   y el tono se invierte.
 - El croma **decae con la distancia recorrida** por el píxel. Conservarlo entero
   al comprimir el rango produce un split-tone neón de manual.
+
+### Ruedas y curvas
+
+Cuatro ruedas y cuatro curvas, entre los controles tonales básicos y la
+saturación final: el mismo sitio donde las pone un procesador raw.
+
+Ninguna de las dos añade una pasada. Una curva es una función de un solo canal,
+así que las cuatro se reducen a una fila RGBA de 256 entradas subida como
+textura: la curva del canal y la maestra se componen exactamente, porque
+`maestra(rojo(x))` sigue siendo una función del rojo. Eso es una lectura de
+textura en lugar de dos. La tabla se reconstruye en la CPU solo cuando el objeto
+de curvas cambia de identidad — el store lo reemplaza en cada cambio y nunca lo
+edita en el sitio, así que una referencia que coincide es prueba de que la tabla
+que hay en la GPU sigue siendo la buena.
+
+La interpolación es **cúbica monótona** (Fritsch–Carlson), no Catmull-Rom ni una
+spline natural. Las dos se pasan de largo: baja un punto y la curva se hunde por
+debajo de él antes de llegar, lo que aparece como una banda oscura sobre un
+degradado que nadie ha dibujado y de la que no hay forma de dar cuenta.
+
+Las ruedas son lift, gamma, gain y offset, y cada una está anclada en un sitio
+distinto — que es justamente la razón de que sean cuatro. La base desplaza todo
+el rango, las sombras pivotan en el blanco y por eso caen sobre los oscuros, las
+luces pivotan en el negro y por eso caen sobre los claros, y los medios dejan
+clavados los dos extremos y doblan lo que hay entre ellos.
+
+Dos decisiones dentro de eso:
+
+- Al disco se le **resta la media**, de modo que cambia el equilibrio entre
+  canales y nunca el brillo; el brillo lo mueve el anillo de debajo. Se puede
+  perseguir una dominante sin ver cómo se va el brillo, y ajustar el brillo sin
+  que el color lo siga.
+- Medios y luces se miden en **pasos**. +1 duplica, −1 divide entre dos, y las
+  dos direcciones se sienten igual. Un multiplicador lineal no.
+
+Y un fallo que merece quedar escrito, porque es de los que se esconden. Subir la
+tabla de curvas la dejaba enlazada a la unidad de textura que estuviera activa
+—la 0, donde vive la fotografía—. A partir de ahí toda imagen se dibujaba como la
+propia rampa de la tabla: de negro a blanco, de izquierda a derecha. Sobre la
+rampa gris que usan las pruebas tonales eso es casi la respuesta correcta, y
+setenta y dos pruebas pasaron mientras el editor mostraba un degradado gris en
+lugar de la foto. La prueba de regresión mide un campo **plano**, donde una rampa
+no tiene dónde esconderse.
+
+### Los scopes
+
+Histograma, forma de onda, parade RGB y vectorscopio, flotando sobre la foto en
+vez de guardados en una pestaña: un scope solo sirve mientras estás moviendo
+algo, y en cuanto mirarlo cuesta un clic, nadie lo mira.
+
+Leen una miniatura propia —unos doscientos píxeles en el lado largo, por la misma
+pasada de color— en lugar de leer de vuelta la vista previa. Leer un búfer de
+dibujo a tamaño completo bloquea la GPU en cada fotograma; cuarenta mil muestras
+sobran para una distribución y son lo bastante baratas como para rehacerlas
+dentro del mismo fotograma que las dibujó.
+
+Para ellos solo corre la pasada de color. Nitidez, reducción de ruido y
+desenfoque son espaciales y no significan nada a ese tamaño, y el grano llenaría
+la onda de un ruido que no está en la foto a ningún tamaño al que nadie vaya a
+verla. Los scopes miden el grade, que es para lo que están.
+
+Dos cosas fáciles de hacer mal:
+
+- Un gráfico nunca se dibuja más ancho de lo que la imagen tiene columnas, ni más
+  alto de lo que hay niveles que distinguir. Dibujarlo más grande no añade
+  detalle: reparte las mismas medidas entre más celdas y deja huecos, lo que se
+  lee como una señal rota y no como una ampliada. Cada gráfico se mide a su propio
+  tamaño y se escala al lienzo después.
+- El recorte se informa con **dos números, no con dos barras**. Un cielo quemado
+  mete en la última casilla píxeles suficientes para aplastar todo el resto del
+  histograma contra la base, así que las casillas de los extremos quedan fuera de
+  la escala y se dicen en porcentaje debajo.
 
 ### El encuadre
 
@@ -215,8 +293,8 @@ npx playwright install chromium   # una sola vez
 npm test
 ```
 
-Treinta y siete pruebas que corren en un Chromium headless, en menos de un
-segundo. No hay pruebas de interfaz: el riesgo de este proyecto está en los
+Setenta y tres pruebas que corren en un Chromium headless. No hay pruebas de
+interfaz: el riesgo de este proyecto está en los
 shaders y en la geometría, y eso no se puede afirmar nada sobre ello en un DOM
 simulado. Cada prueba renderiza una imagen conocida por el mismo camino que usa
 el botón de exportar y comprueba estadísticas de píxeles.
@@ -227,9 +305,12 @@ acaba desalineado de lo que pretendía demostrar.
 
 Las pruebas se validaron **reintroduciendo los fallos reales** que aparecieron
 durante el desarrollo, para comprobar que fallan cuando deben. Ese ejercicio
-encontró dos cosas: que el test del grano no detectaba nada porque medía sobre un
-degradado cuya pendiente enmascaraba el sesgo, y que uno de los diagnósticos del
-README era falso (ver la nota en «Las pasadas»).
+lleva ya cuatro hallazgos: el test del grano no detectaba nada, porque medía
+sobre un degradado cuya pendiente enmascaraba el sesgo; uno de los diagnósticos
+de este README era falso (ver la nota en «Las pasadas»); y dos de las pruebas del
+grade, tal como estaban escritas al principio, no demostraban nada — una componía
+una curva consigo misma, donde el orden no puede importar, y la otra medía la
+rueda de sombras justo donde el canal ya estaba saturando.
 
 ## Formatos
 
@@ -251,6 +332,7 @@ se avisa de ello.
 | `⌘E` | Exportar |
 | `\` | Mantener pulsado para ver el original |
 | `C` | Entrar y salir del recorte |
+| `S` | Mostrar y ocultar los scopes |
 | `Esc` | Salir del recorte |
 | Doble clic en un slider | Devolverlo a su valor por defecto |
 | Doble clic en la foto | Alternar entre ajustar y 200% |

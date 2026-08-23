@@ -4,6 +4,7 @@ import { LUMA, hasWideGamutContent, supportsWideGamut, workingSpace } from '../s
 import { renderToBlob } from '../src/lib/export'
 import { DEFAULT_ADJUSTMENTS } from '../src/types/adjustments'
 import { defaultGeometry } from '../src/types/geometry'
+import { defaultGrade } from '../src/types/grade'
 import { useEditor } from '../src/state/editorStore'
 
 async function wideGamutFile(size = 64): Promise<File> {
@@ -102,7 +103,7 @@ describe('gestión de color', () => {
     const bitmap = await wideGamutImage()
     const blob = await renderToBlob(
       bitmap,
-      { adjustments: DEFAULT_ADJUSTMENTS, geometry: defaultGeometry(64, 64) },
+      { adjustments: DEFAULT_ADJUSTMENTS, grade: defaultGrade(), geometry: defaultGeometry(64, 64) },
       { format: 'image/png', quality: 1, maxEdge: null, colorSpace: 'display-p3' },
     )
     const header = new TextDecoder('latin1').decode(
@@ -154,7 +155,7 @@ describe('gestión de color', () => {
     const bitmap = await wideGamutImage()
     const blob = await renderToBlob(
       bitmap,
-      { adjustments: DEFAULT_ADJUSTMENTS, geometry: defaultGeometry(64, 64) },
+      { adjustments: DEFAULT_ADJUSTMENTS, grade: defaultGrade(), geometry: defaultGeometry(64, 64) },
       { format: 'image/png', quality: 1, maxEdge: null, colorSpace: 'srgb' },
     )
     const decoded = await createImageBitmap(blob, { colorSpaceConversion: 'default' })

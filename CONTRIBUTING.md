@@ -29,15 +29,15 @@ except you. Please actually run it.
 The interesting part is the render pipeline. Everything else is a control surface
 attached to it.
 
-An edit is a **flat, serialisable object** — `Adjustments` plus `Geometry`. No
+An edit is a **serialisable object** — `Adjustments`, `Grade` and `Geometry`. No
 tool anywhere touches pixels; tools write into that object and the renderer reads
 it. If you find yourself wanting to mutate image data directly, that is a strong
 sign the change belongs in a shader instead.
 
 ```
 src/engine/     the GPU: context, passes, GLSL
-src/types/      the edit model — adjustments, geometry, presets
-src/lib/        decoding, storage, export, maths, history labels
+src/types/      the edit model — adjustments, grade, geometry, presets
+src/lib/        decoding, storage, export, maths, curves, scopes, labels
 src/state/      one Zustand store: edit, history, session
 src/i18n/       dictionaries and language detection
 src/components/ the interface

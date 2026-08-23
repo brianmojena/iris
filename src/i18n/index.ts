@@ -80,10 +80,27 @@ export function fill(template: string, values: Record<string, string | number>):
  * written.
  */
 export function formatNumber(value: number, decimals: number, locale?: string): string {
+  return format(value, decimals, locale, value === 0 ? 'never' : 'exceptZero')
+}
+
+/**
+ * The same, without the leading sign. For quantities that are counts rather than
+ * offsets — a percentage of clipped pixels is not "+2,3 %" of anything.
+ */
+export function formatPlain(value: number, decimals: number, locale?: string): string {
+  return format(value, decimals, locale, 'never')
+}
+
+function format(
+  value: number,
+  decimals: number,
+  locale: string | undefined,
+  signDisplay: 'never' | 'exceptZero',
+): string {
   const resolved = locale ?? currentLocale()
   return new Intl.NumberFormat(resolved === 'es' ? 'es-ES' : 'en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-    signDisplay: value === 0 ? 'never' : 'exceptZero',
+    signDisplay,
   }).format(value)
 }

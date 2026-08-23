@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AdjustmentsPanel } from './components/AdjustmentsPanel'
+import { GradePanel } from './components/GradePanel'
 import { GeometryPanel } from './components/GeometryPanel'
 import { HistoryPanel } from './components/HistoryPanel'
 import { CanvasView } from './components/CanvasView'
 import { Dropzone } from './components/Dropzone'
 import { ExportDialog } from './components/ExportDialog'
 import { TopBar } from './components/TopBar'
-import { IconClock, IconClose, IconCrop, IconSliders } from './components/icons'
+import { IconClock, IconClose, IconCrop, IconCurve, IconSliders } from './components/icons'
 import { useEditor } from './state/editorStore'
 import { useDict } from './i18n'
 
@@ -21,7 +22,8 @@ export default function App() {
 
   const [exporting, setExporting] = useState(false)
   const [comparing, setComparing] = useState(false)
-  const [tab, setTab] = useState<'adjust' | 'crop' | 'history'>('adjust')
+  const [tab, setTab] = useState<'adjust' | 'color' | 'crop' | 'history'>('adjust')
+  const [scopes, setScopes] = useState(false)
   const t = useDict()
   // Drag events bubble through every child, so track enter/leave depth.
   const dragDepth = useRef(0)
@@ -56,6 +58,8 @@ export default function App() {
         setComparing(true)
       } else if (event.key.toLowerCase() === 'c' && !mod && image) {
         setTab((current) => (current === 'crop' ? 'adjust' : 'crop'))
+      } else if (event.key.toLowerCase() === 's' && !mod && image) {
+        setScopes((current) => !current)
       } else if (event.key === 'Escape') {
         setTab('adjust')
       }
@@ -118,10 +122,25 @@ export default function App() {
         if (file) void openFile(file)
       }}
     >
-      <TopBar onExport={openExport} onCompareChange={setComparing} comparing={comparing} />
+      <TopBar
+        onExport={openExport}
+        onCompareChange={setComparing}
+        comparing={comparing}
+        scopes={scopes}
+        onScopesChange={setScopes}
+      />
 
       <div className="workspace">
-        {image ? <CanvasView showOriginal={comparing} cropMode={tab === 'crop'} /> : <Dropzone />}
+        {image ? (
+          <CanvasView
+            showOriginal={comparing}
+            cropMode={tab === 'crop'}
+            showScopes={scopes}
+            onCloseScopes={() => setScopes(false)}
+          />
+        ) : (
+          <Dropzone />
+        )}
 
         <div className="panel-host">
           <nav className="tabs" aria-label={t.app.tools}>
@@ -131,6 +150,13 @@ export default function App() {
               onClick={() => setTab('adjust')}
             >
               <IconSliders /> {t.tabs.adjust}
+            </button>
+            <button
+              className="tabs__tab"
+              aria-pressed={tab === 'color'}
+              onClick={() => setTab('color')}
+            >
+              <IconCurve /> {t.tabs.color}
             </button>
             <button
               className="tabs__tab"
@@ -149,6 +175,7 @@ export default function App() {
           </nav>
 
           {tab === 'adjust' && <AdjustmentsPanel onExport={openExport} />}
+          {tab === 'color' && <GradePanel onExport={openExport} />}
           {tab === 'crop' && <GeometryPanel onDone={() => setTab('adjust')} />}
           {tab === 'history' && <HistoryPanel />}
         </div>

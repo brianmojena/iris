@@ -64,7 +64,7 @@ export async function renderToBlob(
   const renderer = new Renderer(canvas, workingSpace())
   try {
     renderer.setImage(bitmap)
-    renderer.render(edit.adjustments, width, height, { geometry: edit.geometry })
+    renderer.render(edit, width, height)
 
     const encodable =
       options.colorSpace === workingSpace() ? canvas : convert(canvas, options.colorSpace)

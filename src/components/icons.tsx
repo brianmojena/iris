@@ -142,3 +142,21 @@ export const IconClock = ({ size = 17 }: IconProps) => (
     <path d="M10 6v4.25l2.75 1.75" />
   </svg>
 )
+
+/** The grading tab: a curve rising across its plot. */
+export const IconCurve = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M3.5 16.5v-13" />
+    <path d="M3.5 16.5h13" />
+    <path d="M3.5 14C8 14 8 6 16.5 6" />
+  </svg>
+)
+
+/** The scopes: three traces of different heights. */
+export const IconScope = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M3.5 16.5v-13" />
+    <path d="M3.5 16.5h13" />
+    <path d="M6.5 14v-3.5M10 14V6M13.5 14v-5.5" />
+  </svg>
+)

@@ -19,7 +19,7 @@ export const en: Dictionary = {
     tools: 'Tools',
   },
 
-  tabs: { adjust: 'Adjust', crop: 'Crop', history: 'History' },
+  tabs: { adjust: 'Adjust', color: 'Color', crop: 'Crop', history: 'History' },
 
   dropzone: {
     title: 'Drop a photo here',
@@ -50,9 +50,48 @@ export const en: Dictionary = {
     grain: 'Grain',
   },
 
+  grade: {
+    wheelsTitle: 'Color wheels',
+    curvesTitle: 'Curves',
+    // Lift, gamma, gain and offset, named for what they do to the photograph.
+    wheels: {
+      offset: 'Offset',
+      lift: 'Shadows',
+      gamma: 'Midtones',
+      gain: 'Highlights',
+    },
+    wheelHints: {
+      offset: 'Shifts the whole range evenly.',
+      lift: 'Tints the shadows and leaves white alone.',
+      gamma: 'Tints the midtones with both ends pinned.',
+      gain: 'Tints the highlights and leaves black alone.',
+    },
+    channels: { rgb: 'RGB', r: 'Red', g: 'Green', b: 'Blue' },
+    master: 'Master',
+    resetWheel: 'Reset {name}',
+    resetCurve: 'Reset the {name} curve',
+    curveHint: 'Drag to move · tap the line to add a point · double tap to remove it',
+    balance: '{name} balance',
+    point: 'Point {index}: input {input}, output {output}',
+  },
+
+  scopes: {
+    title: 'Scopes',
+    show: 'Show the scopes',
+    hide: 'Hide the scopes',
+    close: 'Close the scopes',
+    histogram: 'Histogram',
+    waveform: 'Waveform',
+    parade: 'Parade',
+    vectorscope: 'Vector',
+    clipped: '{low}% to black · {high}% to white',
+    note: 'They measure colour; effects are not included.',
+  },
+
   panel: {
     reset: 'Reset',
     emptyAdjust: 'Open a photo to start editing.',
+    emptyColor: 'Open a photo to grade it.',
     emptyCrop: 'Open a photo to crop it.',
     emptyHistory: 'Open a photo to see its history.',
   },
@@ -105,6 +144,9 @@ export const en: Dictionary = {
     aspectFree: 'Aspect ratio free',
     aspectCustom: 'Aspect ratio custom',
     preset: 'Preset: {name}',
+    wheel: '{name} wheel',
+    curve: '{name} curve',
+    gradeReset: 'Color reset',
   },
 
   export: {

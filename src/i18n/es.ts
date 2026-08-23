@@ -22,7 +22,7 @@ export const es = {
     tools: 'Herramientas',
   },
 
-  tabs: { adjust: 'Ajustes', crop: 'Recorte', history: 'Historial' },
+  tabs: { adjust: 'Ajustes', color: 'Color', crop: 'Recorte', history: 'Historial' },
 
   dropzone: {
     title: 'Arrastra una foto aquí',
@@ -53,9 +53,48 @@ export const es = {
     grain: 'Grano',
   },
 
+  grade: {
+    wheelsTitle: 'Ruedas de color',
+    curvesTitle: 'Curvas',
+    // Lift, gamma, gain y offset, nombrados por lo que hacen en la foto.
+    wheels: {
+      offset: 'Base',
+      lift: 'Sombras',
+      gamma: 'Medios',
+      gain: 'Luces',
+    },
+    wheelHints: {
+      offset: 'Desplaza todo el rango por igual.',
+      lift: 'Colorea las sombras sin tocar el blanco.',
+      gamma: 'Colorea los medios y deja fijos los dos extremos.',
+      gain: 'Colorea las luces sin tocar el negro.',
+    },
+    channels: { rgb: 'RGB', r: 'Rojo', g: 'Verde', b: 'Azul' },
+    master: 'Maestro',
+    resetWheel: 'Restablecer {name}',
+    resetCurve: 'Restablecer la curva {name}',
+    curveHint: 'Arrastra para mover · toca la línea para añadir un punto · doble toque para quitarlo',
+    balance: 'Equilibrio de {name}',
+    point: 'Punto {index}: entrada {input}, salida {output}',
+  },
+
+  scopes: {
+    title: 'Scopes',
+    show: 'Mostrar los scopes',
+    hide: 'Ocultar los scopes',
+    close: 'Cerrar los scopes',
+    histogram: 'Histograma',
+    waveform: 'Onda',
+    parade: 'Parade',
+    vectorscope: 'Vector',
+    clipped: '{low} % a negro · {high} % a blanco',
+    note: 'Miden el color; los efectos no entran.',
+  },
+
   panel: {
     reset: 'Restablecer',
     emptyAdjust: 'Abre una foto para empezar a editar.',
+    emptyColor: 'Abre una foto para graduarla.',
     emptyCrop: 'Abre una foto para recortarla.',
     emptyHistory: 'Abre una foto para ver su historial.',
   },
@@ -108,6 +147,9 @@ export const es = {
     aspectFree: 'Proporción libre',
     aspectCustom: 'Proporción personalizada',
     preset: 'Preajuste: {name}',
+    wheel: 'Rueda {name}',
+    curve: 'Curva {name}',
+    gradeReset: 'Color restablecido',
   },
 
   export: {

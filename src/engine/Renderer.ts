@@ -6,13 +6,26 @@ import { DENOISE_FRAG } from './shaders/denoise.frag'
 import { BLUR_FRAG } from './shaders/blur.frag'
 import { FINISH_FRAG } from './shaders/finish.frag'
 import { needsEffectPasses, type Adjustments } from '../types/adjustments'
-import { outputSize, sourceTransform, type CropRect, type Geometry } from '../types/geometry'
-import { identity } from '../lib/matrix'
+import { outputSize, sourceTransform, type CropRect } from '../types/geometry'
+import type { Edit } from '../types/edit'
+import { CURVE_SIZE, defaultGrade, hasCurves, hasWheels, wheelUniforms, type Curves } from '../types/grade'
+import { curveTexture } from '../lib/curve'
 import { dict } from '../i18n'
 import { LUMA, workingSpace, type ColorSpace } from '../lib/colorSpace'
 
 /** Blur radius in source pixels when the slider is at 100. */
 const MAX_BLUR_RADIUS = 40
+
+/** Longest edge of the proxy the scopes measure. */
+const SCOPE_EDGE = 224
+
+/**
+ * Texture units. Named rather than written as bare numbers because binding is
+ * global state: a texture uploaded while the wrong unit is active replaces
+ * whatever that unit was holding, and the photograph is what unit 0 holds.
+ */
+const IMAGE_UNIT = 0
+const CURVE_UNIT = 1
 
 /**
  * Slider units are chosen for humans; the shader wants -1..1. This is the only
@@ -37,8 +50,14 @@ export class RendererError extends Error {}
 
 export interface RenderOptions {
   bypass?: boolean
-  geometry?: Geometry
   cropOverride?: CropRect
+}
+
+/** Raw pixels of the graded image at thumbnail size, for the scopes. */
+export interface ScopeSample {
+  data: Uint8Array
+  width: number
+  height: number
 }
 
 /**
@@ -66,6 +85,11 @@ export class Renderer {
   private texture: WebGLTexture | null = null
   private sourceWidth = 0
   private sourceHeight = 0
+
+  /** The baked curve table, and the object it was baked from. */
+  private curveLut: WebGLTexture | null = null
+  private curveSource: Curves | null = null
+  private scopeTarget: RenderTarget | null = null
 
   private readonly colorSpace: ColorSpace
 
@@ -121,6 +145,18 @@ export class Renderer {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
     gl.bindVertexArray(null)
     this.vao = vao
+
+    // Built even when no curve has been drawn: the sampler is bound on every
+    // pass, and a sampler pointing at nothing is undefined behaviour on some
+    // drivers even inside a branch that is never taken.
+    this.curveLut = gl.createTexture()
+    if (!this.curveLut) throw new RendererError(dict().notices.textureFailed)
+    this.bindTexture(CURVE_UNIT, this.curveLut)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    this.uploadCurves(defaultGrade().curves)
   }
 
   get width(): number {
@@ -143,7 +179,7 @@ export class Renderer {
     const texture = gl.createTexture()
     if (!texture) throw new RendererError(dict().notices.textureFailed)
 
-    gl.bindTexture(gl.TEXTURE_2D, texture)
+    this.bindTexture(IMAGE_UNIT, texture)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
@@ -165,13 +201,9 @@ export class Renderer {
    * straightened image while the stored crop is still just a selection.
    * `bypass` skips the colour pipeline for the before/after comparison.
    */
-  render(
-    adjustments: Adjustments,
-    width: number,
-    height: number,
-    options: RenderOptions = {},
-  ): void {
+  render(edit: Edit, width: number, height: number, options: RenderOptions = {}): void {
     if (!this.texture) return
+    const adjustments = edit.adjustments
 
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width
@@ -183,21 +215,19 @@ export class Renderer {
 
     if (!spatial) {
       this.toScreen(width, height)
-      this.drawBase(adjustments, width, height, options, true)
+      this.drawBase(edit, width, height, options, true)
       return
     }
 
     // Full resolution of the framed result, so blur and grain look the same in
     // the preview as they will in the exported file.
-    const full = options.geometry
-      ? outputSize(options.geometry, this.sourceWidth, this.sourceHeight).width
-      : this.sourceWidth
+    const full = outputSize(edit.geometry, this.sourceWidth, this.sourceHeight).width
     const pixelScale = width / Math.max(full, 1)
 
     const targets = this.ensureTargets(adjustments, width, height)
 
     targets[0].bind()
-    this.drawBase(adjustments, width, height, options, false)
+    this.drawBase(edit, width, height, options, false)
     let current = targets[0]
 
     if (adjustments.denoise > 0) {
@@ -258,6 +288,32 @@ export class Renderer {
     this.draw()
   }
 
+  /**
+   * Renders the colour pipeline at thumbnail size and hands back the pixels.
+   *
+   * Only the colour pass runs. Sharpening, denoise and blur are spatial and mean
+   * nothing at two hundred pixels across, and grain would fill a waveform with
+   * noise that is not in the photograph at the size anybody will view it. So the
+   * scopes measure the grade, which is what they are there to help you set.
+   */
+  readScope(edit: Edit, options: RenderOptions = {}, maxEdge = SCOPE_EDGE): ScopeSample | null {
+    if (!this.texture) return null
+    const framed = outputSize(edit.geometry, this.sourceWidth, this.sourceHeight)
+    const scale = Math.min(1, maxEdge / Math.max(framed.width, framed.height, 1))
+    const width = Math.max(1, Math.round(framed.width * scale))
+    const height = Math.max(1, Math.round(framed.height * scale))
+
+    const target = (this.scopeTarget ??= new RenderTarget(this.gl))
+    target.resize(width, height)
+    target.bind()
+    this.drawBase(edit, width, height, options, false)
+
+    const data = new Uint8Array(width * height * 4)
+    this.gl.readPixels(0, 0, width, height, this.gl.RGBA, this.gl.UNSIGNED_BYTE, data)
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null)
+    return { data, width, height }
+  }
+
   /** True once the context has been lost; the app rebuilds the renderer then. */
   isContextLost(): boolean {
     return this.gl.isContextLost()
@@ -266,32 +322,68 @@ export class Renderer {
   // --- internals -----------------------------------------------------------
 
   private drawBase(
-    adjustments: Adjustments,
+    edit: Edit,
     width: number,
     height: number,
     options: RenderOptions,
     ownsDithering: boolean,
   ): void {
+    const { adjustments, grade } = edit
     this.base.use()
     // The only pass that reads the decoded bitmap, so the only one that flips.
     this.base.setFloat('u_flipY', 1)
-    this.bindTexture(0, this.texture!)
-    this.base.setInt('u_image', 0)
+    this.bindTexture(IMAGE_UNIT, this.texture!)
+    this.base.setInt('u_image', IMAGE_UNIT)
     this.base.setFloat('u_bypass', options.bypass ? 1 : 0)
     this.base.setFloat('u_dither', ownsDithering ? 1 : 0)
     this.base.setVec2('u_resolution', width, height)
     this.base.setVec3('u_luma', ...LUMA[this.colorSpace])
     this.base.setMat3(
       'u_transform',
-      options.geometry
-        ? sourceTransform(options.geometry, this.sourceWidth, this.sourceHeight, options.cropOverride)
-        : identity(),
+      sourceTransform(edit.geometry, this.sourceWidth, this.sourceHeight, options.cropOverride),
     )
 
     for (const [name, value] of Object.entries(toUniforms(adjustments))) {
       this.base.setFloat(name, value)
     }
+
+    // --- grade -------------------------------------------------------------
+    const wheels = hasWheels(grade.wheels)
+    this.base.setFloat('u_hasWheels', wheels ? 1 : 0)
+    if (wheels) {
+      const u = wheelUniforms(grade.wheels)
+      this.base.setVec3('u_offset', ...u.offset)
+      this.base.setVec3('u_lift', ...u.lift)
+      this.base.setVec3('u_gamma', ...u.gamma)
+      this.base.setVec3('u_gain', ...u.gain)
+    }
+
+    // Compared by identity, not by value: the store replaces the curves object
+    // on every change and never edits one in place, so a matching reference is
+    // proof the table on the GPU is still the right one.
+    this.bindTexture(CURVE_UNIT, this.curveLut!)
+    if (this.curveSource !== grade.curves) this.uploadCurves(grade.curves)
+    this.base.setFloat('u_hasCurves', hasCurves(grade.curves) ? 1 : 0)
+    this.base.setInt('u_curves', CURVE_UNIT)
+
     this.draw()
+  }
+
+  private uploadCurves(curves: Curves): void {
+    const gl = this.gl
+    this.bindTexture(CURVE_UNIT, this.curveLut!)
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA8,
+      CURVE_SIZE,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      curveTexture(curves, CURVE_SIZE),
+    )
+    this.curveSource = curves
   }
 
   /** Allocates only the targets this combination of effects actually needs. */
@@ -338,6 +430,10 @@ export class Renderer {
     this.disposeTexture()
     for (const target of this.targets) target.dispose()
     this.targets.length = 0
+    this.scopeTarget?.dispose()
+    this.scopeTarget = null
+    if (this.curveLut) this.gl.deleteTexture(this.curveLut)
+    this.curveLut = null
     this.base.dispose()
     this.denoise.dispose()
     this.blur.dispose()

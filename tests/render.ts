@@ -1,6 +1,7 @@
 import { Renderer } from '../src/engine/Renderer'
 import { DEFAULT_ADJUSTMENTS, type Adjustments } from '../src/types/adjustments'
 import { defaultGeometry, outputSize, type Geometry } from '../src/types/geometry'
+import { defaultGrade, type Grade } from '../src/types/grade'
 import type { Edit } from '../src/types/edit'
 
 export interface Rendered {
@@ -13,9 +14,11 @@ export function edit(
   bitmap: ImageBitmap,
   adjustments: Partial<Adjustments> = {},
   geometry: Partial<Geometry> = {},
+  grade: Partial<Grade> = {},
 ): Edit {
   return {
     adjustments: { ...DEFAULT_ADJUSTMENTS, ...adjustments },
+    grade: { ...defaultGrade(), ...grade },
     geometry: { ...defaultGeometry(bitmap.width, bitmap.height), ...geometry },
   }
 }
@@ -41,7 +44,7 @@ export async function render(
   const renderer = new Renderer(canvas)
   try {
     renderer.setImage(bitmap)
-    renderer.render(source.adjustments, width, height, { geometry: source.geometry })
+    renderer.render(source, width, height)
     // Reading through a 2D context, because the drawing buffer of a WebGL canvas
     // is not guaranteed to survive past the current task.
     const readable = new OffscreenCanvas(width, height)

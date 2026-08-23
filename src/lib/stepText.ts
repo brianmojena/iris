@@ -24,6 +24,12 @@ export function stepText(label: StepLabel, t: Dictionary): string {
       const builtIn = t.presets.builtIn[label.presetId as keyof typeof t.presets.builtIn]
       return fill(t.history.preset, { name: builtIn ?? label.name ?? '' })
     }
+    case 'wheel':
+      return fill(t.history.wheel, { name: t.grade.wheels[label.wheel] })
+    case 'curve':
+      return fill(t.history.curve, { name: t.grade.channels[label.channel] })
+    case 'gradeReset':
+      return t.history.gradeReset
     case 'rotate':
       return label.clockwise ? t.history.rotateRight : t.history.rotateLeft
     case 'flip':

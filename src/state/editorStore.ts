@@ -1,7 +1,16 @@
 import { create } from 'zustand'
 import { DEFAULT_ADJUSTMENTS, isDefault, type AdjustmentKey } from '../types/adjustments'
 import { defaultGeometry, isDefaultGeometry, type Geometry } from '../types/geometry'
-import { sameEdit, type Edit } from '../types/edit'
+import { freshEdit, normaliseEdit, sameEdit, type Edit } from '../types/edit'
+import {
+  cloneGrade,
+  defaultGrade,
+  isNeutralGrade,
+  type Curve,
+  type CurveChannel,
+  type Wheel,
+  type WheelKey,
+} from '../types/grade'
 import { BUILT_IN_PRESETS, type Preset } from '../types/presets'
 import { INITIAL_LABEL, describeChange, type StepLabel } from '../lib/describe'
 import { dict, fill } from '../i18n'
@@ -54,10 +63,13 @@ interface EditorState {
   startEdit: () => void
   setAdjustment: (key: AdjustmentKey, value: number) => void
   setGeometry: (patch: Partial<Geometry>) => void
+  setWheel: (key: WheelKey, patch: Partial<Wheel>) => void
+  setCurve: (channel: CurveChannel, curve: Curve) => void
   endEdit: () => void
   /** Applies a change and records it as a single history entry immediately. */
   commit: (patch: Partial<Edit>, label?: StepLabel) => void
   resetAdjustments: () => void
+  resetGrade: () => void
   resetGeometry: () => void
 
   undo: () => void
@@ -72,10 +84,6 @@ interface EditorState {
   setExportOptions: (patch: Partial<ExportOptions>) => void
   setExporting: (value: boolean) => void
   notify: (notice: Notice | null) => void
-}
-
-function freshEdit(width: number, height: number): Edit {
-  return { adjustments: { ...DEFAULT_ADJUSTMENTS }, geometry: defaultGeometry(width, height) }
 }
 
 /**
@@ -145,12 +153,18 @@ export const useEditor = create<EditorState>((set, get) => ({
       try {
         const image = await decodeBlob(saved.file, saved.fileName)
         sessionFile = { blob: saved.file, name: saved.fileName }
-        const index = Math.min(Math.max(saved.index, 0), saved.history.length - 1)
+        // A session written by an older build has no grade in it; filling that
+        // in here means the rest of the app never has to wonder.
+        const history = saved.history.map((entry) => ({
+          ...entry,
+          edit: normaliseEdit(entry.edit, image.bitmap.width, image.bitmap.height),
+        }))
+        const index = Math.min(Math.max(saved.index, 0), history.length - 1)
         set({
           image,
           status: 'ready',
-          edit: saved.history[index].edit,
-          history: saved.history,
+          edit: history[index].edit,
+          history,
           index,
           snapshot: null,
           exportOptions: { ...get().exportOptions, colorSpace: defaultColorSpace(image) },
@@ -220,6 +234,33 @@ export const useEditor = create<EditorState>((set, get) => ({
     set((state) => ({ edit: { ...state.edit, geometry: { ...state.edit.geometry, ...patch } } }))
   },
 
+  // Both of these replace the object rather than editing it in place: the
+  // renderer decides whether to rebuild the curve table by comparing references,
+  // and every history entry is holding one of these.
+  setWheel(key, patch) {
+    set((state) => ({
+      edit: {
+        ...state.edit,
+        grade: {
+          ...state.edit.grade,
+          wheels: { ...state.edit.grade.wheels, [key]: { ...state.edit.grade.wheels[key], ...patch } },
+        },
+      },
+    }))
+  },
+
+  setCurve(channel, curve) {
+    set((state) => ({
+      edit: {
+        ...state.edit,
+        grade: {
+          ...state.edit.grade,
+          curves: { ...state.edit.grade.curves, [channel]: curve },
+        },
+      },
+    }))
+  },
+
   endEdit() {
     const { snapshot, edit } = get()
     if (!snapshot) return
@@ -239,6 +280,11 @@ export const useEditor = create<EditorState>((set, get) => ({
   resetAdjustments() {
     if (isDefault(get().edit.adjustments)) return
     get().commit({ adjustments: { ...DEFAULT_ADJUSTMENTS } }, { kind: 'adjustmentsReset' })
+  },
+
+  resetGrade() {
+    if (isNeutralGrade(get().edit.grade)) return
+    get().commit({ grade: defaultGrade() }, { kind: 'gradeReset' })
   },
 
   resetGeometry() {
@@ -273,6 +319,7 @@ export const useEditor = create<EditorState>((set, get) => ({
           id: p.id,
           name: p.name,
           adjustments: p.adjustments,
+          grade: p.grade,
           builtIn: false,
         })),
       ],
@@ -280,11 +327,16 @@ export const useEditor = create<EditorState>((set, get) => ({
   },
 
   applyPreset(preset) {
-    get().commit({ adjustments: { ...preset.adjustments } }, {
-      kind: 'preset',
-      presetId: preset.id,
-      name: preset.name,
-    })
+    // A preset is a whole look, grade included. One that carries no grade of its
+    // own clears the wheels and curves rather than leaving somebody else's work
+    // sitting underneath it.
+    get().commit(
+      {
+        adjustments: { ...preset.adjustments },
+        grade: preset.grade ? cloneGrade(preset.grade) : defaultGrade(),
+      },
+      { kind: 'preset', presetId: preset.id, name: preset.name },
+    )
   },
 
   async createPreset(name) {
@@ -294,6 +346,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       id: `user-${Date.now().toString(36)}`,
       name: trimmed,
       adjustments: { ...get().edit.adjustments },
+      grade: cloneGrade(get().edit.grade),
       createdAt: Date.now(),
     }
     await storage.savePreset(preset)

@@ -5,7 +5,9 @@
  *   1. decode to linear light
  *   2. exposure and white balance   (physically meaningful in linear)
  *   3. encode back to display gamma
- *   4. tone controls, contrast, saturation (perceptually meaningful in gamma)
+ *   4. tone controls and contrast   (perceptually meaningful in gamma)
+ *   5. the grade: colour wheels, then curves
+ *   6. vibrance and saturation, which finish whatever the grade left
  *
  * Every uniform is normalised to roughly -1..1 on the CPU side, so the shader
  * never has to know about slider ranges.
@@ -30,6 +32,18 @@ uniform float u_temperature; // -1..1
 uniform float u_tint;        // -1..1
 uniform float u_vibrance;    // -1..1
 uniform float u_saturation;  // -1..1
+
+// --- grade ---------------------------------------------------------------
+uniform vec3  u_offset;      // added flat,        neutral 0
+uniform vec3  u_lift;        // pivots at white,   neutral 0
+uniform vec3  u_gamma;       // exponent base,     neutral 1
+uniform vec3  u_gain;        // pivots at black,   neutral 1
+uniform float u_hasWheels;   // 1.0 when any wheel has been moved
+
+/** All four tone curves baked into one row: R, G and B already composed with the master. */
+uniform sampler2D u_curves;
+uniform float u_hasCurves;
+#define CURVE_SIZE 256.0
 
 uniform float u_bypass;      // 1.0 renders the untouched original
 uniform vec2  u_resolution;  // for output dithering
@@ -110,6 +124,38 @@ vec3 applyContrast(vec3 c, float k) {
   return k >= 0.0 ? mix(c, steeper, k) : mix(c, flatter, -k);
 }
 
+/**
+ * Lift, gamma, gain and offset — the four handles every grading desk has had
+ * since telecine, in the order they are wired there.
+ *
+ * Each one is deliberately anchored somewhere different, which is the whole
+ * reason there are four: offset moves the entire range, lift pivots at white so
+ * it lands on the shadows, gain pivots at black so it lands on the highlights,
+ * and gamma leaves both ends nailed down and bends what is between them.
+ */
+vec3 applyWheels(vec3 c) {
+  c += u_offset;
+  c += u_lift * (1.0 - c);
+  c *= u_gain;
+  return pow(max(c, 0.0), 1.0 / u_gamma);
+}
+
+/**
+ * One fetch per channel out of the baked table.
+ *
+ * The coordinate is squeezed onto the centres of the first and last texel:
+ * sampling at 0.0 and 1.0 lands half a texel outside the row, and with linear
+ * filtering that clamps and quietly flattens both ends of every curve.
+ */
+vec3 applyCurves(vec3 c) {
+  vec3 x = c * ((CURVE_SIZE - 1.0) / CURVE_SIZE) + 0.5 / CURVE_SIZE;
+  return vec3(
+    texture(u_curves, vec2(x.r, 0.5)).r,
+    texture(u_curves, vec2(x.g, 0.5)).g,
+    texture(u_curves, vec2(x.b, 0.5)).b
+  );
+}
+
 /** Cheap hash used to break up 8-bit banding in smooth gradients. */
 float dither(vec2 p) {
   return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
@@ -160,6 +206,12 @@ void main() {
   c = retarget(c, lum, lum + endpoints);
 
   c = applyContrast(clamp(c, 0.0, 1.0), u_contrast);
+
+  // --- grade -------------------------------------------------------------
+  // Wheels before curves: the wheels set where the three channels sit relative
+  // to each other, and the curves are then drawn against what you can see.
+  if (u_hasWheels > 0.5) c = clamp(applyWheels(clamp(c, 0.0, 1.0)), 0.0, 1.0);
+  if (u_hasCurves > 0.5) c = applyCurves(clamp(c, 0.0, 1.0));
 
   // --- colour ------------------------------------------------------------
   c = clamp(c, 0.0, 1.0);

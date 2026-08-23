@@ -1,5 +1,15 @@
 import { isDefault, type AdjustmentKey } from '../types/adjustments'
 import { ASPECT_PRESETS, type Geometry } from '../types/geometry'
+import {
+  isNeutralGrade,
+  isNeutralWheel,
+  sameGrade,
+  WHEEL_KEYS,
+  type CurveChannel,
+  type Grade,
+  type WheelKey,
+} from '../types/grade'
+import { changedChannels } from './curve'
 import { changedAdjustments, type Edit } from '../types/edit'
 
 /**
@@ -16,6 +26,9 @@ export type StepLabel =
   | { kind: 'adjustmentsReset' }
   | { kind: 'adjustmentsMultiple' }
   | { kind: 'preset'; presetId: string; name?: string }
+  | { kind: 'wheel'; wheel: WheelKey }
+  | { kind: 'curve'; channel: CurveChannel }
+  | { kind: 'gradeReset' }
   | { kind: 'rotate'; clockwise: boolean }
   | { kind: 'flip'; axis: 'horizontal' | 'vertical' }
   | { kind: 'straighten'; angle: number }
@@ -26,6 +39,25 @@ export type StepLabel =
   | { kind: 'text'; text: string }
 
 export const INITIAL_LABEL: StepLabel = { kind: 'initial' }
+
+function describeGrade(from: Grade, to: Grade): StepLabel {
+  if (isNeutralGrade(to) && !isNeutralGrade(from)) return { kind: 'gradeReset' }
+
+  const wheel = WHEEL_KEYS.find(
+    (key) =>
+      from.wheels[key].x !== to.wheels[key].x ||
+      from.wheels[key].y !== to.wheels[key].y ||
+      from.wheels[key].master !== to.wheels[key].master,
+  )
+  if (wheel) return { kind: 'wheel', wheel }
+
+  const channel = changedChannels(from.curves, to.curves)[0]
+  if (channel) return { kind: 'curve', channel }
+
+  // Nothing recognisable changed; the wheels are the safer thing to name.
+  const touched = WHEEL_KEYS.find((key) => !isNeutralWheel(to.wheels[key]))
+  return touched ? { kind: 'wheel', wheel: touched } : { kind: 'curve', channel: 'rgb' }
+}
 
 function describeGeometry(from: Geometry, to: Geometry): StepLabel {
   if (from.rotation !== to.rotation) {
@@ -52,7 +84,11 @@ function describeGeometry(from: Geometry, to: Geometry): StepLabel {
 export function describeChange(from: Edit, to: Edit): StepLabel {
   const keys = changedAdjustments(from.adjustments, to.adjustments)
 
-  if (keys.length === 0) return describeGeometry(from.geometry, to.geometry)
+  if (keys.length === 0) {
+    return sameGrade(from.grade, to.grade)
+      ? describeGeometry(from.geometry, to.geometry)
+      : describeGrade(from.grade, to.grade)
+  }
   if (keys.length === 1) return { kind: 'adjustment', key: keys[0], value: to.adjustments[keys[0]] }
 
   return isDefault(to.adjustments) ? { kind: 'adjustmentsReset' } : { kind: 'adjustmentsMultiple' }

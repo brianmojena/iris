@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { DEFAULT_ADJUSTMENTS } from '../src/types/adjustments'
 import { defaultGeometry, flipGeometry, rotateQuarter } from '../src/types/geometry'
+import { defaultGrade } from '../src/types/grade'
 import { describeChange } from '../src/lib/describe'
 import { stepText } from '../src/lib/stepText'
 import type { Edit } from '../src/types/edit'
@@ -9,6 +10,7 @@ import { en } from '../src/i18n/en'
 
 const base: Edit = {
   adjustments: { ...DEFAULT_ADJUSTMENTS },
+  grade: defaultGrade(),
   geometry: defaultGeometry(1000, 500),
 }
 
@@ -87,6 +89,11 @@ describe('diccionarios', () => {
     // Nombres de estándares de color: no se traducen en ningún idioma.
     'sRGB',
     'Display P3',
+    // Vocabulario de etalonaje: se usa en inglés dentro del español, igual que
+    // en cualquier sala de color, y traducirlo sería más raro que dejarlo.
+    'Scopes',
+    'Parade',
+    'Vector',
   ]
 
   test('no queda ninguna cadena sin traducir', () => {

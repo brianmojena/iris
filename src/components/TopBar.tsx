@@ -2,15 +2,23 @@ import { useRef } from 'react'
 import { ACCEPTED_FILE_TYPES } from '../lib/decode'
 import { useEditor } from '../state/editorStore'
 import { LOCALES, useDict, useLocaleStore } from '../i18n'
-import { IconCompare, IconDownload, IconRedo, IconUndo } from './icons'
+import { IconCompare, IconDownload, IconRedo, IconScope, IconUndo } from './icons'
 
 interface TopBarProps {
   onExport: () => void
   onCompareChange: (active: boolean) => void
   comparing: boolean
+  scopes: boolean
+  onScopesChange: (active: boolean) => void
 }
 
-export function TopBar({ onExport, onCompareChange, comparing }: TopBarProps) {
+export function TopBar({
+  onExport,
+  onCompareChange,
+  comparing,
+  scopes,
+  onScopesChange,
+}: TopBarProps) {
   const image = useEditor((s) => s.image)
   const loading = useEditor((s) => s.status === 'loading')
   const openFile = useEditor((s) => s.openFile)
@@ -34,7 +42,7 @@ export function TopBar({ onExport, onCompareChange, comparing }: TopBarProps) {
       {loading && (
         <span className="topbar__loading" role="status">
           <span className="spinner" aria-hidden="true" />
-          Abriendo…
+          {t.app.opening}
         </span>
       )}
 
@@ -62,6 +70,16 @@ export function TopBar({ onExport, onCompareChange, comparing }: TopBarProps) {
               <IconRedo />
             </button>
           </div>
+
+          <button
+            className={`btn btn--icon${scopes ? ' btn--active' : ''}`}
+            onClick={() => onScopesChange(!scopes)}
+            aria-pressed={scopes}
+            title={scopes ? t.scopes.hide : t.scopes.show}
+            aria-label={scopes ? t.scopes.hide : t.scopes.show}
+          >
+            <IconScope />
+          </button>
 
           <button
             className={`btn${comparing ? ' btn--active' : ''}`}

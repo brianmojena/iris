@@ -11,7 +11,7 @@
   --danger: #b4442e;
   --radius: 10px;
   --radius-sm: 6px;
-  --panel-width: 300px;
+  --panel-width: 320px;
   --topbar-height: 56px;
   --shadow-sm: 0 1px 2px rgba(28, 27, 25, 0.06);
   --shadow-md: 0 8px 30px rgba(28, 27, 25, 0.1);
@@ -513,21 +513,31 @@ button:disabled {
 .tabs {
   display: flex;
   gap: 2px;
-  padding: 8px 10px;
+  padding: 8px 8px;
   border-bottom: 1px solid var(--border);
 }
 
+/* Four tabs in a 320px column: the icon is the anchor and the word is allowed
+   to give way before the row does. */
 .tabs__tab {
   flex: 1;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 5px;
   height: 32px;
+  padding: 0 4px;
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
   color: var(--text-muted);
   transition: background 120ms ease, color 120ms ease;
+}
+
+.tabs__tab svg {
+  flex: none;
 }
 
 .tabs__tab:hover {
@@ -979,6 +989,252 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Grading: wheels ────────────────────────────────────────────────────── */
+
+.wheels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+  padding: 2px 0 8px;
+}
+
+.wheel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.wheel__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  transition: color 120ms ease;
+}
+
+.wheel--modified .wheel__label {
+  color: var(--text);
+}
+
+.wheel__label:disabled {
+  opacity: 1;
+}
+
+/* The hue ring runs anticlockwise from red at three o'clock, which is where the
+   maths in types/grade puts it; saturation falls off to neutral at the middle. */
+.wheel__disc {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  cursor: crosshair;
+  touch-action: none;
+  background:
+    radial-gradient(circle at 50% 50%, #ffffff 0%, rgba(255, 255, 255, 0) 74%),
+    conic-gradient(
+      from 90deg,
+      #ff3b30 0deg,
+      #ff3bd8 60deg,
+      #3b5bff 120deg,
+      #3bd8ff 180deg,
+      #3bff6e 240deg,
+      #e8ff3b 300deg,
+      #ff3b30 360deg
+    );
+}
+
+.wheel__handle {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid var(--text);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
+.wheel--dragging .wheel__handle {
+  transform: scale(1.15);
+}
+
+.wheel__master {
+  position: relative;
+  height: 18px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.wheel__rail,
+.wheel__fill {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+}
+
+.wheel__rail {
+  left: 0;
+  right: 0;
+  background: var(--border);
+}
+
+.wheel__fill {
+  background: var(--accent);
+}
+
+.wheel__knob {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+}
+
+/* ── Grading: curves ────────────────────────────────────────────────────── */
+
+.group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.group__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.group__action:hover:not(:disabled) {
+  background: var(--canvas-bg);
+  color: var(--text);
+}
+
+.segmented--curve {
+  margin: 8px 0 10px;
+}
+
+/* A dot under a channel that has been drawn on, so a curve hiding behind an
+   unselected tab still announces itself. */
+.segmented__marked::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.segmented button {
+  position: relative;
+}
+
+.curve__plot {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.curve__hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+/* ── Scopes ─────────────────────────────────────────────────────────────── */
+
+.scopes {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: min(292px, calc(100% - 28px));
+  padding: 8px;
+  border-radius: var(--radius);
+  background: rgba(15, 15, 17, 0.94);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-md);
+  color: #f4f3f1;
+  user-select: none;
+}
+
+.scopes__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.segmented--dark {
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.segmented--dark button {
+  height: 24px;
+  padding: 0 2px;
+  font-size: 11px;
+  color: rgba(244, 243, 241, 0.6);
+}
+
+.segmented--dark button[aria-pressed='true'] {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  box-shadow: none;
+}
+
+.scopes__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  color: rgba(244, 243, 241, 0.6);
+}
+
+.scopes__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.scopes__plot {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.scopes__meta {
+  margin: 6px 2px 1px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(244, 243, 241, 0.55);
+}
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 820px) {
@@ -1026,6 +1282,38 @@ button:disabled {
     height: 36px;
   }
 
+  /* Two wheels abreast is already tight on a phone; four would be unusable.
+     The disc is capped so a full-width panel does not turn each one into a
+     dinner plate and push the curves off the bottom of the screen. */
+  .wheels {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 18px;
+  }
+
+  .wheel__disc {
+    width: 100%;
+    max-width: 132px;
+    margin: 0 auto;
+  }
+
+  .wheel__handle,
+  .wheel__knob {
+    width: 15px;
+    height: 15px;
+    margin: -7.5px 0 0 -7.5px;
+  }
+
+  .wheel__master {
+    height: 26px;
+  }
+
+  .scopes {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+
   .slider__thumb {
     width: 18px;
     height: 18px;
@@ -1044,3 +1332,4 @@ button:disabled {
     max-width: none;
   }
 }
+

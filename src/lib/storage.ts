@@ -27,6 +27,8 @@ export interface StoredPreset {
   name: string
   /** Only colour and effects; a preset must never move somebody's crop. */
   adjustments: Edit['adjustments']
+  /** Optional: presets saved before wheels and curves existed do not have one. */
+  grade?: Edit['grade']
   createdAt: number
 }
 

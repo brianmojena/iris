@@ -14,17 +14,18 @@ npm run dev
 
 ## What it does
 
-Fifteen controls across light, colour, detail and effects. Colour-managed:
-it works in Display P3, so a wide-gamut photo keeps the colours it arrived with. A crop editor with
+Fifteen controls across light, colour, detail and effects, plus a grading tab:
+four colour wheels and four tone curves, with a histogram, waveform, RGB parade
+and vectorscope floating over the picture. Colour-managed: it works in Display
+P3, so a wide-gamut photo keeps the colours it arrived with. A crop editor with
 fixed ratios, straightening, quarter turns and flips. A navigable history panel.
 Your own presets alongside six that ship with it. Your session comes back on its
 own when you return. The interface speaks English and Spanish.
 
 ## How it is built
 
-Everything happens on the GPU. The edit itself is a flat, serialisable object
-(`src/types/adjustments.ts`); no tool touches pixels, they only write into that
-object. Non-destructive editing, history and presets all fall out of that for
+Everything happens on the GPU. The edit itself is one serialisable object
+(`src/types/edit.ts`); no tool touches pixels, they only write into that object. Non-destructive editing, history and presets all fall out of that for
 free.
 
 ```
@@ -42,7 +43,10 @@ src/
     export.ts                full-size render and download
     matrix.ts                3×3 affine, in the order WebGL expects
     crop.ts                  handle dragging and aspect ratios
+    curve.ts                 monotone spline and the curve lookup table
+    scopes.ts                histogram, waveform, parade, vectorscope
   types/geometry.ts          framing: turns, flips, straightening, crop
+  types/grade.ts             wheels and curves, and the wheel maths
   state/editorStore.ts       state, history, undo and redo
   components/                the interface
 ```
@@ -57,7 +61,9 @@ The order mirrors a raw processor:
 1. Decode to linear light.
 2. Exposure and white balance, which only mean anything physical in linear.
 3. Encode back to display gamma.
-4. Tonal range, contrast and saturation, which are perceptual.
+4. Tonal range and contrast, which are perceptual.
+5. The grade: colour wheels, then curves.
+6. Vibrance and saturation, finishing whatever the grade left.
 
 Three decisions that were expensive to arrive at, all documented in the shader:
 
@@ -69,6 +75,75 @@ Three decisions that were expensive to arrive at, all documented in the shader:
   different points and the hue flips.
 - Chroma **decays with how far the pixel travelled**. Keeping it intact while
   compressing the range produces a textbook neon split-tone.
+
+### Grading: wheels and curves
+
+Four wheels and four curves, sitting between the basic tone controls and the
+final saturation — the same place a raw processor puts them.
+
+Neither adds a pass. A curve is a function of one channel, so all four collapse
+into a single 256-entry RGBA row uploaded as a texture: the per-channel curve and
+the master curve compose exactly, because `master(red(x))` is still just a
+function of red. That is one fetch instead of two. The table is rebuilt on the
+CPU only when the curve object changes identity — the store replaces it on every
+change and never edits one in place, so a matching reference is proof the table
+on the GPU is still the right one.
+
+The interpolation is **monotone cubic** (Fritsch–Carlson), not Catmull-Rom or a
+natural spline. Both of those overshoot: drag a point low and the curve dips
+below it on the way in, which shows up as a dark band across a gradient that the
+user never drew and cannot account for.
+
+The wheels are lift, gamma, gain and offset, each anchored somewhere different —
+which is the whole reason there are four. Offset moves the entire range, lift
+pivots at white so it lands on the shadows, gain pivots at black so it lands on
+the highlights, and gamma nails both ends down and bends what is between them.
+
+Two decisions inside them:
+
+- The disc is **mean-removed**, so it changes only the balance between channels
+  and never the brightness; the ring underneath is what moves brightness. You can
+  chase a colour cast without watching the exposure wander, and set the exposure
+  without the colour following it.
+- Gamma and gain are measured in **stops**. +1 doubles, −1 halves, and the two
+  directions feel the same. A linear multiplier does not.
+
+And one bug worth recording, because it is the kind that hides. Uploading the
+curve table bound it to whatever texture unit happened to be active — which was
+unit 0, where the photograph lives. Every image then rendered as the table's own
+ramp: black to white, left to right. On the grey ramp the tone tests use, that is
+very nearly the correct answer, and seventy-two tests passed while the editor
+showed a grey gradient instead of the photo. The regression test measures a
+**flat** field, where a ramp has nothing to hide behind.
+
+### The scopes
+
+Histogram, waveform, RGB parade and vectorscope, floating over the photograph
+rather than filed away in a tab: a scope is only useful while you are moving
+something, and the moment it costs a click to look at, nobody looks.
+
+They read a thumbnail of their own — around two hundred pixels on the long edge,
+through the same colour pass — rather than reading the preview back. Reading a
+full-size drawing buffer stalls the GPU every frame; forty thousand samples is
+plenty for a distribution and cheap enough to rebuild inside the frame that drew
+it.
+
+Only the colour pass runs for them. Sharpening, denoise and blur are spatial and
+mean nothing at that size, and grain would fill a waveform with noise that is not
+in the photograph at any size anyone will view it. The scopes measure the grade,
+which is what they are there to help you set.
+
+Two things that are easy to get wrong:
+
+- A plot is never drawn wider than the picture has columns, nor taller than there
+  are levels to tell apart. Drawing it larger adds no detail — it spreads the same
+  measurements across more cells and leaves gaps between them, which reads as a
+  broken signal rather than a magnified one. Each plot is measured at its own size
+  and scaled onto the canvas afterwards.
+- Clipping is reported as **two numbers, not two bars**. One blown sky puts enough
+  pixels in the last bin to flatten the entire rest of the histogram into the
+  baseline, so the end bins are left out of the scale and stated as percentages
+  underneath instead.
 
 ### The framing
 
@@ -206,7 +281,7 @@ npx playwright install chromium   # once
 npm test
 ```
 
-Thirty-seven tests running in a headless Chromium, in under a second. There are
+Seventy-three tests running in a headless Chromium. There are
 no interface tests: the risk in this project lives in the shaders and the
 geometry, and there is nothing meaningful to assert about those in a simulated
 DOM. Each test renders a known image through the same path the export button uses
@@ -217,10 +292,13 @@ files: a binary in the repository is opaque in review and drifts from whatever i
 was meant to prove.
 
 The tests were validated by **reintroducing the real bugs** that came up during
-development, to confirm they fail when they should. That exercise found two
-things: the grain test was detecting nothing, because it measured across a
-gradient whose own slope masked the bias; and one of the diagnoses in this README
-was false (see the note under "The passes").
+development, to confirm they fail when they should. That exercise has now caught
+four things: the grain test was detecting nothing, because it measured across a
+gradient whose own slope masked the bias; one of the diagnoses in this README was
+false (see the note under "The passes"); and two of the grading tests as first
+written proved nothing at all — one composed a curve with itself, where the order
+cannot matter, and one measured the lift wheel where the channel was already
+clipping.
 
 ## Formats
 
@@ -242,6 +320,7 @@ told so.
 | `⌘E` | Export |
 | `\` | Hold to see the original |
 | `C` | Enter and leave the crop editor |
+| `S` | Show and hide the scopes |
 | `Esc` | Leave the crop editor |
 | Double-click a slider | Return it to its default |
 | Double-click the photo | Toggle between fit and 200% |

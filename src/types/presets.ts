@@ -1,4 +1,5 @@
 import { DEFAULT_ADJUSTMENTS, type Adjustments } from './adjustments'
+import type { Grade } from './grade'
 
 /** Ids of the presets that ship with the app; their names live in the dictionaries. */
 export type BuiltInPresetId = 'warm' | 'cool' | 'punch' | 'matte' | 'bw' | 'film'
@@ -6,6 +7,8 @@ export type BuiltInPresetId = 'warm' | 'cool' | 'punch' | 'matte' | 'bw' | 'film
 export interface Preset {
   id: string
   adjustments: Adjustments
+  /** Wheels and curves. Absent on presets saved before either existed. */
+  grade?: Grade
   /** Factory presets ship with the app and cannot be deleted or overwritten. */
   builtIn: boolean
   /** Only user presets carry a name; the built-in ones are named by id. */
