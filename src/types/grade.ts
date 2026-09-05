@@ -1,5 +1,8 @@
+import { cloneSecondary, sameSecondaries, type Secondary } from './secondary'
+
 /**
- * The grading stage: four colour wheels and four tone curves.
+ * The grading stage: four colour wheels, four tone curves and up to four
+ * secondaries.
  *
  * It lives beside `Adjustments` rather than inside it because everything in that
  * object is a single number — history labelling, presets and the reset check all
@@ -83,14 +86,18 @@ export function isNeutralWheel(w: Wheel): boolean {
 // --- the grade -------------------------------------------------------------
 
 export interface Grade {
+  /** The primary: everything here reaches every pixel. */
   wheels: Wheels
   curves: Curves
+  /** Secondaries: corrections that reach only what their matte covers. */
+  secondaries: Secondary[]
 }
 
 export function defaultGrade(): Grade {
   return {
     wheels: { offset: neutralWheel(), lift: neutralWheel(), gamma: neutralWheel(), gain: neutralWheel() },
     curves: { rgb: neutralCurve(), r: neutralCurve(), g: neutralCurve(), b: neutralCurve() },
+    secondaries: [],
   }
 }
 
@@ -103,7 +110,7 @@ export function hasWheels(wheels: Wheels): boolean {
 }
 
 export function isNeutralGrade(grade: Grade): boolean {
-  return !hasWheels(grade.wheels) && !hasCurves(grade.curves)
+  return !hasWheels(grade.wheels) && !hasCurves(grade.curves) && grade.secondaries.length === 0
 }
 
 function sameCurve(a: Curve, b: Curve): boolean {
@@ -112,6 +119,7 @@ function sameCurve(a: Curve, b: Curve): boolean {
 
 export function sameGrade(a: Grade, b: Grade): boolean {
   return (
+    sameSecondaries(a.secondaries, b.secondaries) &&
     WHEEL_KEYS.every(
       (key) =>
         a.wheels[key].x === b.wheels[key].x &&
@@ -136,6 +144,7 @@ export function cloneGrade(grade: Grade): Grade {
       g: grade.curves.g.map((p) => ({ ...p })),
       b: grade.curves.b.map((p) => ({ ...p })),
     },
+    secondaries: grade.secondaries.map(cloneSecondary),
   }
 }
 

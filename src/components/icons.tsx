@@ -160,3 +160,11 @@ export const IconScope = ({ size = 17 }: IconProps) => (
     <path d="M6.5 14v-3.5M10 14V6M13.5 14v-5.5" />
   </svg>
 )
+
+/** The eyedropper: take the key colour from the photograph itself. */
+export const IconPipette = ({ size = 17 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M16.5 3.5a2 2 0 0 0-2.8 0l-1.5 1.5-.8-.8-1.4 1.4 4.4 4.4 1.4-1.4-.8-.8 1.5-1.5a2 2 0 0 0 0-2.8Z" />
+    <path d="M11.2 7.9 4.5 14.6V17h2.4l6.7-6.7" />
+  </svg>
+)

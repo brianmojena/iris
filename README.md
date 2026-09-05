@@ -15,7 +15,8 @@ npm run dev
 ## What it does
 
 Fifteen controls across light, colour, detail and effects, plus a grading tab:
-four colour wheels and four tone curves, with a histogram, waveform, RGB parade
+four colour wheels and four tone curves, up to four selective corrections keyed
+by colour or bounded by a power window, and a histogram, waveform, RGB parade
 and vectorscope floating over the picture. Colour-managed: it works in Display
 P3, so a wide-gamut photo keeps the colours it arrived with. A crop editor with
 fixed ratios, straightening, quarter turns and flips. A navigable history panel.
@@ -47,6 +48,7 @@ src/
     scopes.ts                histogram, waveform, parade, vectorscope
   types/geometry.ts          framing: turns, flips, straightening, crop
   types/grade.ts             wheels and curves, and the wheel maths
+  types/secondary.ts         qualifiers, windows, and how they reach the shader
   state/editorStore.ts       state, history, undo and redo
   components/                the interface
 ```
@@ -64,6 +66,7 @@ The order mirrors a raw processor:
 4. Tonal range and contrast, which are perceptual.
 5. The grade: colour wheels, then curves.
 6. Vibrance and saturation, finishing whatever the grade left.
+7. The secondaries, each reaching only what its matte covers.
 
 Three decisions that were expensive to arrive at, all documented in the shader:
 
@@ -115,6 +118,52 @@ ramp: black to white, left to right. On the grey ramp the tone tests use, that i
 very nearly the correct answer, and seventy-two tests passed while the editor
 showed a grey gradient instead of the photo. The regression test measures a
 **flat** field, where a ramp has nothing to hide behind.
+
+### Secondaries: qualifiers and windows
+
+A secondary is a **matte** and a **correction**. The matte comes from a colour
+qualifier — a range of hue, saturation and luminance — from a geometric window,
+or from the two multiplied together; the correction is a compact set of controls
+applied through whatever comes out.
+
+There is a hard limit of four, and they run inside the same fragment shader as
+everything else, as a loop over seven `vec4` arrays. No extra pass, no extra
+texture, no matte buffer. An unused slot costs one comparison, and a slot that is
+neither being applied nor previewed is skipped before its matte is evaluated at
+all.
+
+Five decisions worth naming:
+
+- **Every secondary is packed, inert ones included**, so slot *i* in the shader is
+  always secondary *i* in the panel. A key gets dialled before its correction
+  exists — that is the order anybody works in — which means the secondary you are
+  staring at in the matte view is exactly the one a "pack only what does
+  something" filter would throw away.
+- The luminance band reads **luminance, not HSV's value**. Value is only the
+  largest channel; by that measure a saturated blue is as bright as white, and
+  "select the light parts" would select the sky.
+- A window's half-sizes are fractions of the image's **height, x included**. In
+  plain 0..1 coordinates a rotation shears the shape the moment the picture is not
+  square, and a circle turned forty-five degrees comes out an egg.
+- The drawn outline is where the matte reaches **zero**; feather says how far back
+  inside it the falloff begins. One outline describes the whole thing, and a
+  dashed inner ring shows where it starts.
+- Dragging a window moves it by **how far the pointer travelled**, not to where
+  the pointer is. Grabbing a mask by its edge and watching it teleport under the
+  cursor is the difference between placing one and fighting one.
+
+The eyedropper reads the scope proxy rather than the pixel under the cursor: that
+thumbnail has already averaged a small neighbourhood, and picking the literal
+pixel hands back whatever grain happened to be sitting there. It reads the colour
+*before* any secondary has run, because what it is for is telling a qualifier
+which colour to key on.
+
+**What is not here** is spatial refinement of the matte — blurring, shrinking or
+denoising the key. The softness on each band does the equivalent work in value
+space, which is what those sliders are for, but a key dialled tight on a noisy
+photograph will crawl. Doing it properly means computing the matte in a pass of
+its own so it can be blurred, and that is a change the floating-point pipeline
+would pay for anyway.
 
 ### The scopes
 
@@ -281,7 +330,7 @@ npx playwright install chromium   # once
 npm test
 ```
 
-Seventy-three tests running in a headless Chromium. There are
+Ninety tests running in a headless Chromium. There are
 no interface tests: the risk in this project lives in the shaders and the
 geometry, and there is nothing meaningful to assert about those in a simulated
 DOM. Each test renders a known image through the same path the export button uses
@@ -292,8 +341,13 @@ files: a binary in the repository is opaque in review and drifts from whatever i
 was meant to prove.
 
 The tests were validated by **reintroducing the real bugs** that came up during
-development, to confirm they fail when they should. That exercise has now caught
-four things: the grain test was detecting nothing, because it measured across a
+development, to confirm they fail when they should. Every claim the secondaries
+make — that a window rotates rigidly, that inverting swaps exactly what changed,
+that luminance is not HSV's value, that a window intersects the qualifier rather
+than joining it — was checked by breaking it and watching the right test, and only
+the right test, go red.
+
+That exercise has now caught four things: the grain test was detecting nothing, because it measured across a
 gradient whose own slope masked the bias; one of the diagnoses in this README was
 false (see the note under "The passes"); and two of the grading tests as first
 written proved nothing at all — one composed a curve with itself, where the order

@@ -9,6 +9,7 @@ import { needsEffectPasses, type Adjustments } from '../types/adjustments'
 import { outputSize, sourceTransform, type CropRect } from '../types/geometry'
 import type { Edit } from '../types/edit'
 import { CURVE_SIZE, defaultGrade, hasCurves, hasWheels, wheelUniforms, type Curves } from '../types/grade'
+import { secondaryUniforms } from '../types/secondary'
 import { curveTexture } from '../lib/curve'
 import { dict } from '../i18n'
 import { LUMA, workingSpace, type ColorSpace } from '../lib/colorSpace'
@@ -51,6 +52,14 @@ export class RendererError extends Error {}
 export interface RenderOptions {
   bypass?: boolean
   cropOverride?: CropRect
+  /**
+   * Draws one secondary's matte in black and white instead of the picture. It is
+   * the only way to see what a key is actually selecting, and every grading desk
+   * has the same button.
+   */
+  matteView?: number | null
+  /** Stops before the secondaries. The colour picker reads what they key on. */
+  primaryOnly?: boolean
 }
 
 /** Raw pixels of the graded image at thumbnail size, for the scopes. */
@@ -210,8 +219,11 @@ export class Renderer {
       this.canvas.height = height
     }
 
-    // The comparison view shows the untouched original, effects included.
-    const spatial = !options.bypass && needsEffectPasses(adjustments)
+    // The comparison view shows the untouched original, effects included. The
+    // matte view skips the spatial chain too: grain and a vignette laid over a
+    // mask would be describing the picture, not the selection.
+    const spatial =
+      !options.bypass && options.matteView == null && needsEffectPasses(adjustments)
 
     if (!spatial) {
       this.toScreen(width, height)
@@ -306,12 +318,35 @@ export class Renderer {
     const target = (this.scopeTarget ??= new RenderTarget(this.gl))
     target.resize(width, height)
     target.bind()
-    this.drawBase(edit, width, height, options, false)
+    // Never the matte: the scopes measure the photograph, and a plot that
+    // silently switched to describing a mask would be read as the photograph.
+    this.drawBase(edit, width, height, { ...options, matteView: null }, false)
 
     const data = new Uint8Array(width * height * 4)
     this.gl.readPixels(0, 0, width, height, this.gl.RGBA, this.gl.UNSIGNED_BYTE, data)
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null)
     return { data, width, height }
+  }
+
+  /**
+   * The colour at a point of the framed image, in 0..1 coordinates with the
+   * origin top left.
+   *
+   * Read from the scope proxy rather than from a one-pixel render: the proxy has
+   * already averaged a small neighbourhood, which is what an eyedropper wants —
+   * picking the literal pixel under the cursor hands back whatever grain
+   * happened to be there. The secondaries are skipped, because what the picker
+   * is for is telling a qualifier which colour to key on, and that is the colour
+   * before any of them ran.
+   */
+  pick(edit: Edit, u: number, v: number, options: RenderOptions = {}): [number, number, number] | null {
+    const sample = this.readScope(edit, { ...options, primaryOnly: true })
+    if (!sample) return null
+    const x = Math.min(sample.width - 1, Math.max(0, Math.round(u * (sample.width - 1))))
+    // Framebuffer rows come back bottom up, and this coordinate is top down.
+    const y = Math.min(sample.height - 1, Math.max(0, Math.round((1 - v) * (sample.height - 1))))
+    const at = (y * sample.width + x) * 4
+    return [sample.data[at], sample.data[at + 1], sample.data[at + 2]]
   }
 
   /** True once the context has been lost; the app rebuilds the renderer then. */
@@ -356,6 +391,21 @@ export class Renderer {
       this.base.setVec3('u_lift', ...u.lift)
       this.base.setVec3('u_gamma', ...u.gamma)
       this.base.setVec3('u_gain', ...u.gain)
+    }
+
+    // --- secondaries -------------------------------------------------------
+    const secondaries = secondaryUniforms(options.primaryOnly ? [] : grade.secondaries)
+    this.base.setInt('u_secondaryCount', secondaries.count)
+    this.base.setInt('u_matteView', options.primaryOnly ? -1 : (options.matteView ?? -1))
+    this.base.setFloat('u_aspect', width / Math.max(height, 1))
+    if (secondaries.count > 0) {
+      this.base.setVec4Array('u_secHue', secondaries.hue)
+      this.base.setVec4Array('u_secSat', secondaries.saturation)
+      this.base.setVec4Array('u_secLum', secondaries.luminance)
+      this.base.setVec4Array('u_secWinA', secondaries.windowA)
+      this.base.setVec4Array('u_secWinB', secondaries.windowB)
+      this.base.setVec4Array('u_secCorrA', secondaries.correctionA)
+      this.base.setVec4Array('u_secCorrB', secondaries.correctionB)
     }
 
     // Compared by identity, not by value: the store replaces the curves object

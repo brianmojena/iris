@@ -80,6 +80,12 @@ export class Program {
     if (loc) this.gl.uniform1i(loc, value)
   }
 
+  /** A whole `vec4[]` in one call; `values` is four floats per element. */
+  setVec4Array(name: string, values: Float32Array): void {
+    const loc = this.location(name)
+    if (loc) this.gl.uniform4fv(loc, values)
+  }
+
   setMat3(name: string, value: Float32Array): void {
     const loc = this.location(name)
     if (loc) this.gl.uniformMatrix3fv(loc, false, value)

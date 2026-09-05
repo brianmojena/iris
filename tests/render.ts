@@ -1,4 +1,4 @@
-import { Renderer } from '../src/engine/Renderer'
+import { Renderer, type RenderOptions } from '../src/engine/Renderer'
 import { DEFAULT_ADJUSTMENTS, type Adjustments } from '../src/types/adjustments'
 import { defaultGeometry, outputSize, type Geometry } from '../src/types/geometry'
 import { defaultGrade, type Grade } from '../src/types/grade'
@@ -38,13 +38,15 @@ export async function render(
    * tests ask for display-p3 to see the gamut the pipeline actually kept.
    */
   readAs: 'srgb' | 'display-p3' = 'srgb',
+  /** Passed straight through, so a test can ask for the matte instead. */
+  options: RenderOptions = {},
 ): Promise<Rendered> {
   const { width, height } = outputSize(source.geometry, bitmap.width, bitmap.height)
   const canvas = new OffscreenCanvas(width, height)
   const renderer = new Renderer(canvas)
   try {
     renderer.setImage(bitmap)
-    renderer.render(source, width, height)
+    renderer.render(source, width, height, options)
     // Reading through a 2D context, because the drawing buffer of a WebGL canvas
     // is not guaranteed to survive past the current task.
     const readable = new OffscreenCanvas(width, height)
@@ -123,4 +125,44 @@ export function imageMean(image: Rendered): number {
 /** Saturation as a fraction of brightness, which is what "looks vivid" tracks. */
 export function chroma([r, g, b]: number[]): number {
   return (Math.max(r, g, b) - Math.min(r, g, b)) / 255
+}
+
+/** Per-channel difference between two renders of the same size. */
+export function difference(a: Rendered, b: Rendered, x: number, y: number): number {
+  const i = (Math.round(y) * a.width + Math.round(x)) * 4
+  return (
+    Math.abs(a.data[i] - b.data[i]) +
+    Math.abs(a.data[i + 1] - b.data[i + 1]) +
+    Math.abs(a.data[i + 2] - b.data[i + 2])
+  )
+}
+
+/**
+ * The box enclosing every pixel a change actually reached.
+ *
+ * Coverage alone cannot tell a circle from an ellipse of the same area, and the
+ * shape of a window is exactly what its maths is for.
+ */
+export function changedBounds(
+  base: Rendered,
+  changed: Rendered,
+  threshold = 12,
+): { left: number; right: number; top: number; bottom: number; count: number } {
+  let left = Infinity
+  let right = -Infinity
+  let top = Infinity
+  let bottom = -Infinity
+  let count = 0
+
+  for (let y = 0; y < base.height; y++) {
+    for (let x = 0; x < base.width; x++) {
+      if (difference(base, changed, x, y) < threshold) continue
+      count++
+      left = Math.min(left, x)
+      right = Math.max(right, x)
+      top = Math.min(top, y)
+      bottom = Math.max(bottom, y)
+    }
+  }
+  return { left, right, top, bottom, count }
 }

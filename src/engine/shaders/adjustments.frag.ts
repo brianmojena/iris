@@ -8,6 +8,7 @@
  *   4. tone controls and contrast   (perceptually meaningful in gamma)
  *   5. the grade: colour wheels, then curves
  *   6. vibrance and saturation, which finish whatever the grade left
+ *   7. the secondaries, each reaching only what its matte covers
  *
  * Every uniform is normalised to roughly -1..1 on the CPU side, so the shader
  * never has to know about slider ranges.
@@ -44,6 +45,25 @@ uniform float u_hasWheels;   // 1.0 when any wheel has been moved
 uniform sampler2D u_curves;
 uniform float u_hasCurves;
 #define CURVE_SIZE 256.0
+
+// --- secondaries ---------------------------------------------------------
+// Packed into vec4 arrays rather than an array of structs: a struct array costs
+// a uniform location lookup and a driver call per member per slot on every
+// frame, and this is seven uniform4fv calls instead.
+#define MAX_SECONDARIES 4
+uniform int  u_secondaryCount;
+uniform vec4 u_secHue[MAX_SECONDARIES];   // centre, range, softness, qualifier on
+uniform vec4 u_secSat[MAX_SECONDARIES];   // low, high, softness, inverted
+uniform vec4 u_secLum[MAX_SECONDARIES];   // low, high, softness, window shape
+uniform vec4 u_secWinA[MAX_SECONDARIES];  // cx, cy, half width, half height
+uniform vec4 u_secWinB[MAX_SECONDARIES];  // cos, sin, feather, -
+uniform vec4 u_secCorrA[MAX_SECONDARIES]; // exposure, contrast, temperature, tint
+uniform vec4 u_secCorrB[MAX_SECONDARIES]; // saturation, hue, apply, -
+
+/** Width over height of what is being drawn, so a window rotates rigidly. */
+uniform float u_aspect;
+/** Index of the secondary whose matte to draw instead of the picture; -1 for none. */
+uniform int u_matteView;
 
 uniform float u_bypass;      // 1.0 renders the untouched original
 uniform vec2  u_resolution;  // for output dithering
@@ -156,6 +176,95 @@ vec3 applyCurves(vec3 c) {
   );
 }
 
+// --- secondaries ---------------------------------------------------------
+
+vec3 rgbToHsv(vec3 c) {
+  vec4 k = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, k.wz), vec4(c.gb, k.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+}
+
+vec3 hsvToRgb(vec3 c) {
+  vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + k.xyz) * 6.0 - k.www);
+  return c.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), c.y);
+}
+
+/** A band with shoulders on both sides. Softness is in the band's own units. */
+float softBand(float value, float low, float high, float softness) {
+  float s = max(softness, 1e-4);
+  return smoothstep(low - s, low + s, value) * (1.0 - smoothstep(high - s, high + s, value));
+}
+
+/**
+ * The same, around a circle. The distance is measured the short way round, so a
+ * band centred on red picks up both the oranges and the magentas beside it
+ * rather than stopping dead at the seam where the hue wraps.
+ */
+float hueKey(float hue, float centre, float range, float softness) {
+  if (range >= 0.5) return 1.0;
+  float d = abs(fract(hue - centre + 0.5) - 0.5);
+  return 1.0 - smoothstep(range, range + max(softness, 1e-4), d);
+}
+
+/**
+ * The geometric part of the matte.
+ *
+ * Everything is measured in fractions of the image's *height*, x included. In
+ * plain 0..1 coordinates a rotation shears the shape as soon as the picture is
+ * not square, and a circle turned forty-five degrees comes out an egg.
+ */
+float windowKey(int shape, vec4 a, vec4 b, vec2 uv) {
+  if (shape == 0) return 1.0;
+  vec2 p = (uv - a.xy) * vec2(u_aspect, 1.0);
+  vec2 turned = vec2(p.x * b.x + p.y * b.y, -p.x * b.y + p.y * b.x);
+  vec2 radii = max(a.zw, vec2(1e-4));
+  vec2 unit = turned / radii;
+  float d = shape == 1 ? length(unit) : max(abs(unit.x), abs(unit.y));
+  // The drawn shape is where the matte reaches zero; feather says how far back
+  // inside it the falloff begins, so one outline describes the whole thing.
+  return 1.0 - smoothstep(1.0 - max(b.z, 1e-3), 1.0, d);
+}
+
+float matteFor(int i, vec3 c, vec2 uv) {
+  vec4 h = u_secHue[i];
+  vec4 s = u_secSat[i];
+  vec4 l = u_secLum[i];
+
+  float key = 1.0;
+  if (h.w > 0.5) {
+    vec3 hsv = rgbToHsv(c);
+    // Brightness is read as luminance rather than HSV's value, which is only
+    // the largest channel: by that measure a saturated blue is as bright as
+    // white, and "select the light parts" would select the sky.
+    key = hueKey(hsv.x, h.x, h.y, h.z)
+        * softBand(hsv.y, s.x, s.y, s.z)
+        * softBand(dot(c, LUMA), l.x, l.y, l.z);
+  }
+  key *= windowKey(int(l.w + 0.5), u_secWinA[i], u_secWinB[i], uv);
+  return s.w > 0.5 ? 1.0 - key : key;
+}
+
+/** The compact correction a secondary carries, applied at full strength. */
+vec3 correct(vec3 c, vec4 a, vec4 b) {
+  vec3 lin = srgbToLinear(c);
+  lin *= exp2(a.x);
+  lin = whiteBalance(lin, a.z, a.w);
+  vec3 result = clamp(linearToSrgb(lin), 0.0, 1.0);
+  result = clamp(applyContrast(result, a.y), 0.0, 1.0);
+
+  if (abs(b.y) > 1e-5) {
+    vec3 hsv = rgbToHsv(result);
+    hsv.x = fract(hsv.x + b.y);
+    result = hsvToRgb(hsv);
+  }
+
+  float grey = dot(result, LUMA);
+  return clamp(mix(vec3(grey), result, 1.0 + b.x), 0.0, 1.0);
+}
+
 /** Cheap hash used to break up 8-bit banding in smooth gradients. */
 float dither(vec2 p) {
   return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
@@ -226,6 +335,23 @@ void main() {
 
   c = mix(vec3(grey), c, 1.0 + u_saturation);
   c = clamp(c, 0.0, 1.0);
+
+  // --- secondaries -------------------------------------------------------
+  // Last, so each one keys on the colour the photograph actually has by now
+  // rather than on something two stages out of date.
+  for (int i = 0; i < MAX_SECONDARIES; i++) {
+    if (i >= u_secondaryCount) break;
+    bool apply = u_secCorrB[i].z > 0.5;
+    bool preview = u_matteView == i;
+    if (!apply && !preview) continue;
+
+    float matte = matteFor(i, c, v_uv);
+    if (preview) {
+      fragColor = vec4(vec3(matte), src.a * coverage);
+      return;
+    }
+    if (matte > 0.001) c = mix(c, correct(c, u_secCorrA[i], u_secCorrB[i]), matte);
+  }
 
   c += u_dither * dither(gl_FragCoord.xy / max(u_resolution, vec2(1.0))) / 255.0;
 

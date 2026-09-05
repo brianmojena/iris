@@ -1,6 +1,7 @@
 import { DEFAULT_ADJUSTMENTS, type AdjustmentKey, type Adjustments } from './adjustments'
 import { defaultGeometry, type Geometry } from './geometry'
 import { defaultGrade, sameGrade, type Grade } from './grade'
+import { MAX_SECONDARIES } from './secondary'
 import { normaliseCurve } from '../lib/curve'
 
 /**
@@ -76,6 +77,7 @@ export function normaliseEdit(edit: Partial<Edit>, width: number, height: number
             g: normaliseCurve(grade.curves?.g ?? base.grade.curves.g),
             b: normaliseCurve(grade.curves?.b ?? base.grade.curves.b),
           },
+          secondaries: (grade.secondaries ?? []).slice(0, MAX_SECONDARIES),
         }
       : base.grade,
   }

@@ -16,8 +16,9 @@ npm run dev
 
 **MVP completo, más historial, persistencia, interfaz bilingüe y etalonaje.**
 Quince controles repartidos en luz, color, detalle y efectos; una pestaña de
-color con cuatro ruedas y cuatro curvas; histograma, forma de onda, parade y
-vectorscopio flotando sobre la foto; editor de recorte con proporciones fijas y
+color con cuatro ruedas y cuatro curvas; hasta cuatro correcciones selectivas,
+seleccionadas por color o acotadas con una ventana; histograma, forma de onda,
+parade y vectorscopio flotando sobre la foto; editor de recorte con proporciones fijas y
 enderezado; panel de historial navegable; preajustes propios y de fábrica; la
 sesión se recupera sola al volver; y la interfaz habla español e inglés.
 
@@ -50,6 +51,7 @@ src/
     scopes.ts                histograma, onda, parade, vectorscopio
   types/geometry.ts          encuadre: giros, volteos, enderezado, recorte
   types/grade.ts             ruedas y curvas, y la matemática de las ruedas
+  types/secondary.ts         selecciones, ventanas y cómo llegan al shader
   state/editorStore.ts       estado, historial, deshacer/rehacer
   components/                interfaz
 ```
@@ -68,6 +70,7 @@ El orden imita al de un procesador raw:
 4. Rango tonal y contraste, que son perceptuales.
 5. El grade: primero las ruedas de color, después las curvas.
 6. Intensidad y saturación, que rematan lo que el grade haya dejado.
+7. Los selectivos, cada uno alcanzando solo lo que su máscara cubre.
 
 Las tres decisiones que costaron encontrar, documentadas en el shader:
 
@@ -122,6 +125,52 @@ rampa gris que usan las pruebas tonales eso es casi la respuesta correcta, y
 setenta y dos pruebas pasaron mientras el editor mostraba un degradado gris en
 lugar de la foto. La prueba de regresión mide un campo **plano**, donde una rampa
 no tiene dónde esconderse.
+
+### Selectivos: selección por color y ventanas
+
+Un selectivo es una **máscara** y una **corrección**. La máscara sale de una
+selección por color —un rango de tono, saturación y luminancia—, de una ventana
+geométrica, o de las dos multiplicadas entre sí; la corrección es un juego
+reducido de controles aplicado a través de lo que salga.
+
+Hay un tope duro de cuatro, y corren dentro del mismo fragment shader que todo lo
+demás, como un bucle sobre siete arrays de `vec4`. Ni una pasada más, ni una
+textura más, ni un búfer de máscara. Una ranura sin usar cuesta una comparación, y
+una que ni se aplica ni se está previsualizando se salta antes de evaluar su
+máscara siquiera.
+
+Cinco decisiones que merecen nombre:
+
+- **Se empaquetan todos, los inertes incluidos**, así que la ranura *i* del shader
+  es siempre el selectivo *i* del panel. Una selección se ajusta antes de que
+  exista su corrección —es el orden en que trabaja cualquiera—, lo que significa
+  que el selectivo que estás mirando en la vista de máscara es justo el que
+  descartaría un filtro de «empaqueta solo lo que hace algo».
+- La banda de luminancia mide **luminancia, no el valor de HSV**. El valor es solo
+  el canal más alto; por esa medida un azul saturado es tan brillante como el
+  blanco, y «selecciona lo claro» seleccionaría el cielo.
+- Las semimedidas de una ventana son fracciones de la **altura de la imagen, la x
+  incluida**. En coordenadas 0..1 planas, un giro deforma la figura en cuanto la
+  foto no es cuadrada, y un círculo girado cuarenta y cinco grados sale huevo.
+- El contorno dibujado es donde la máscara llega a **cero**; el difuminado dice
+  cuánto antes empieza la caída. Un solo contorno lo describe todo, y un anillo
+  discontinuo enseña dónde arranca.
+- Arrastrar la ventana la mueve **lo que se ha movido el puntero**, no hasta donde
+  está el puntero. Agarrar una máscara por el borde y ver cómo se teletransporta
+  bajo el cursor es la diferencia entre colocar una y pelearse con una.
+
+El cuentagotas lee la miniatura de los scopes y no el píxel bajo el cursor: esa
+miniatura ya ha promediado un pequeño vecindario, y tomar el píxel literal
+devuelve el grano que hubiera justo ahí. Lee el color *antes* de que haya corrido
+ningún selectivo, porque para lo que sirve es para decirle a una selección con qué
+color quedarse.
+
+**Lo que no está** es el refinado espacial de la máscara: desenfocarla, encogerla
+o quitarle ruido. El suavizado de cada banda hace el trabajo equivalente en el
+espacio del valor, que es para lo que están esos deslizadores, pero una selección
+apretada sobre una foto con ruido va a hervir. Hacerlo bien exige calcular la
+máscara en una pasada propia para poder desenfocarla, y ese es un cambio que el
+pipeline en coma flotante pagaría de todas formas.
 
 ### Los scopes
 
@@ -293,7 +342,7 @@ npx playwright install chromium   # una sola vez
 npm test
 ```
 
-Setenta y tres pruebas que corren en un Chromium headless. No hay pruebas de
+Noventa pruebas que corren en un Chromium headless. No hay pruebas de
 interfaz: el riesgo de este proyecto está en los
 shaders y en la geometría, y eso no se puede afirmar nada sobre ello en un DOM
 simulado. Cada prueba renderiza una imagen conocida por el mismo camino que usa
@@ -304,7 +353,13 @@ guardan como ficheros: un binario en el repositorio es opaco al revisarlo y
 acaba desalineado de lo que pretendía demostrar.
 
 Las pruebas se validaron **reintroduciendo los fallos reales** que aparecieron
-durante el desarrollo, para comprobar que fallan cuando deben. Ese ejercicio
+durante el desarrollo, para comprobar que fallan cuando deben. Cada cosa que
+afirman los selectivos —que una ventana gira rígida, que invertir cambia
+exactamente lo que antes no cambiaba, que la luminancia no es el valor de HSV, que
+la ventana se cruza con la selección de color en vez de sumarse— se comprobó
+rompiéndola y viendo caer la prueba correcta, y solo la correcta.
+
+Ese ejercicio
 lleva ya cuatro hallazgos: el test del grano no detectaba nada, porque medía
 sobre un degradado cuya pendiente enmascaraba el sesgo; uno de los diagnósticos
 de este README era falso (ver la nota en «Las pasadas»); y dos de las pruebas del

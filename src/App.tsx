@@ -137,6 +137,7 @@ export default function App() {
             cropMode={tab === 'crop'}
             showScopes={scopes}
             onCloseScopes={() => setScopes(false)}
+            grading={tab === 'color'}
           />
         ) : (
           <Dropzone />

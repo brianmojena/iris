@@ -9,6 +9,7 @@ import {
   type Grade,
   type WheelKey,
 } from '../types/grade'
+import { sameSecondaries, sameSecondary } from '../types/secondary'
 import { changedChannels } from './curve'
 import { changedAdjustments, type Edit } from '../types/edit'
 
@@ -29,6 +30,9 @@ export type StepLabel =
   | { kind: 'wheel'; wheel: WheelKey }
   | { kind: 'curve'; channel: CurveChannel }
   | { kind: 'gradeReset' }
+  | { kind: 'secondaryAdded'; index: number }
+  | { kind: 'secondaryRemoved'; index: number }
+  | { kind: 'secondary'; index: number }
   | { kind: 'rotate'; clockwise: boolean }
   | { kind: 'flip'; axis: 'horizontal' | 'vertical' }
   | { kind: 'straighten'; angle: number }
@@ -42,6 +46,18 @@ export const INITIAL_LABEL: StepLabel = { kind: 'initial' }
 
 function describeGrade(from: Grade, to: Grade): StepLabel {
   if (isNeutralGrade(to) && !isNeutralGrade(from)) return { kind: 'gradeReset' }
+
+  if (!sameSecondaries(from.secondaries, to.secondaries)) {
+    if (to.secondaries.length > from.secondaries.length) {
+      return { kind: 'secondaryAdded', index: to.secondaries.length - 1 }
+    }
+    if (to.secondaries.length < from.secondaries.length) {
+      const gone = from.secondaries.findIndex((s) => !to.secondaries.some((t) => t.id === s.id))
+      return { kind: 'secondaryRemoved', index: Math.max(gone, 0) }
+    }
+    const changed = to.secondaries.findIndex((s, i) => !sameSecondary(from.secondaries[i], s))
+    return { kind: 'secondary', index: Math.max(changed, 0) }
+  }
 
   const wheel = WHEEL_KEYS.find(
     (key) =>

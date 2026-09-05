@@ -30,6 +30,12 @@ export function stepText(label: StepLabel, t: Dictionary): string {
       return fill(t.history.curve, { name: t.grade.channels[label.channel] })
     case 'gradeReset':
       return t.history.gradeReset
+    case 'secondaryAdded':
+      return fill(t.history.secondaryAdded, { index: label.index + 1 })
+    case 'secondaryRemoved':
+      return fill(t.history.secondaryRemoved, { index: label.index + 1 })
+    case 'secondary':
+      return fill(t.history.secondary, { index: label.index + 1 })
     case 'rotate':
       return label.clockwise ? t.history.rotateRight : t.history.rotateLeft
     case 'flip':

@@ -36,7 +36,7 @@ sign the change belongs in a shader instead.
 
 ```
 src/engine/     the GPU: context, passes, GLSL
-src/types/      the edit model — adjustments, grade, geometry, presets
+src/types/      the edit model — adjustments, grade, secondaries, geometry
 src/lib/        decoding, storage, export, maths, curves, scopes, labels
 src/state/      one Zustand store: edit, history, session
 src/i18n/       dictionaries and language detection

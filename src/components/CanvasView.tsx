@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Renderer, type ScopeSample } from '../engine/Renderer'
-import { useEditor } from '../state/editorStore'
+import { activeSecondaryIndex, useEditor } from '../state/editorStore'
 import { straightenedBounds, turnedSize } from '../types/geometry'
 import { CropOverlay } from './CropOverlay'
 import { Scopes } from './Scopes'
+import { WindowOverlay } from './WindowOverlay'
 import { dict, useDict } from '../i18n'
 import { IconFit, IconMinus, IconPlus } from './icons'
 
@@ -36,6 +37,8 @@ interface CanvasViewProps {
   cropMode: boolean
   showScopes: boolean
   onCloseScopes: () => void
+  /** True while the grading panel is open, which is when a window is editable. */
+  grading: boolean
 }
 
 export function CanvasView({
@@ -43,10 +46,22 @@ export function CanvasView({
   cropMode,
   showScopes,
   onCloseScopes,
+  grading,
 }: CanvasViewProps) {
   const image = useEditor((s) => s.image)
   const edit = useEditor((s) => s.edit)
   const geometry = edit.geometry
+
+  const gradeTab = useEditor((s) => s.gradeTab)
+  const secondaryIndex = useEditor(activeSecondaryIndex)
+  const matteView = useEditor((s) => s.matteView)
+  const picking = useEditor((s) => s.picking)
+  const pickColour = useEditor((s) => s.pickColour)
+
+  const selective = grading && gradeTab === 'selective'
+  const activeSecondary = secondaryIndex >= 0 ? edit.grade.secondaries[secondaryIndex] : null
+  const activeWindow = activeSecondary?.window ?? null
+  const matteIndex = selective && matteView && secondaryIndex >= 0 ? secondaryIndex : null
 
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -205,6 +220,7 @@ export function CanvasView({
 
       const options = {
         bypass: showOriginal,
+        matteView: matteIndex,
         cropOverride: cropMode
           ? { cx: 0, cy: 0, width: bounds.width, height: bounds.height }
           : undefined,
@@ -226,6 +242,7 @@ export function CanvasView({
     showOriginal,
     cropMode,
     showScopes,
+    matteIndex,
     bounds.width,
     bounds.height,
   ])
@@ -280,8 +297,26 @@ export function CanvasView({
     return () => stage.removeEventListener('wheel', onWheel)
   }, [image, zoomAt, cropMode])
 
+  /** Reads the colour under the pointer and hands it to the armed qualifier. */
+  const pickAt = (event: React.PointerEvent): void => {
+    const canvas = canvasRef.current
+    const renderer = rendererRef.current
+    if (!canvas || !renderer) return
+    const rect = canvas.getBoundingClientRect()
+    const u = (event.clientX - rect.left) / rect.width
+    const v = (event.clientY - rect.top) / rect.height
+    // A tap that lands beside the photograph is a miss, not a black pixel.
+    if (u < 0 || u > 1 || v < 0 || v > 1) return
+    const colour = renderer.pick(edit, u, v)
+    if (colour) pickColour(colour)
+  }
+
   const handlePointerDown = (event: React.PointerEvent) => {
     if (!image || cropMode) return
+    if (picking) {
+      pickAt(event)
+      return
+    }
     pointers.current.set(event.pointerId, event)
     try {
       ;(event.target as Element).setPointerCapture?.(event.pointerId)
@@ -385,12 +420,29 @@ export function CanvasView({
           width: displayWidth ? `${displayWidth}px` : undefined,
           height: displayHeight ? `${displayHeight}px` : undefined,
           transform: `translate3d(${view.x}px, ${view.y}px, 0)`,
-          cursor: !cropMode && view.zoom > 1 ? (panning ? 'grabbing' : 'grab') : 'default',
+          cursor: picking
+            ? 'crosshair'
+            : !cropMode && view.zoom > 1
+              ? panning
+                ? 'grabbing'
+                : 'grab'
+              : 'default',
           // The straightened image is drawn with transparent corners, so the
           // drop shadow would trace the canvas box instead of the picture.
           boxShadow: cropMode ? 'none' : undefined,
         }}
       />
+
+      {image && selective && activeWindow && activeWindow.shape !== 'none' && (
+        <WindowOverlay
+          displayWidth={displayWidth}
+          displayHeight={displayHeight}
+          offsetX={view.x}
+          offsetY={view.y}
+          secondaryId={activeSecondary!.id}
+          window={activeWindow}
+        />
+      )}
 
       {image && cropMode && (
         <CropOverlay
